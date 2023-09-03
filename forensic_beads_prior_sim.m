@@ -2,7 +2,7 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
 function forensic_beads_prior_sim;
 
-%Gets conditional probabilities biased by subjective prior 
+%Gets conditional probabilities biased by subjective prior
 
 
 %data_trunc.xlsx, I formated from data_exp_11596-v23_task-mwjx (1).csv,
@@ -20,7 +20,7 @@ stimuli.raw(nan_indices,9) = stimuli.raw(nan_indices+1,9);  %assign the missing 
 [stimuli.raw(:,[10 11])] = ...
     get_contexts(stimuli);
 
-stimuli.prior = .25;
+stimuli.prior = .5;
 [stimuli.raw(:,[12 13])] = ...
     get_model_behaviour(stimuli);
 
@@ -159,40 +159,65 @@ function model_behaviour = get_model_behaviour(stimuli)
 raw = stimuli.raw;
 prior = stimuli.prior;
 
-%on which indices is the display screen 0 (prior rating prompt so first rating
+% %on which indices is the display screen 0 (prior rating prompt so first rating
 seq_start_indices = find(stimuli.raw(:,5)==0);
 
 %For each start index, loop through sequence and get model predictions and
 %adjustments for model and human
-for seq = 1:numel(seq_start_indices);
+claim_it = 0;
+for seq = 1:size(seq_start_indices);
     
-    %initialise model probabilities and adjustments
-    model_behaviour(seq_start_indices,1) = stimuli.prior*100;     %model assumes 50/50 chance
-    model_behaviour(seq_start_indices,2) = NaN; 
+    %     %initialise model probabilities and adjustments
+    %     model_behaviour(seq_start_indices(seq),1) = stimuli.prior*100;     %model assumes 50/50 chance
+    %     model_behaviour(seq_start_indices(seq),2) = NaN;
     
     
-    %Loop through this sequence
-    for claim = 2:11;
+    %Loop through this sequence (assume they are always 10 all the time, as they should be)
+    ng = 0; %guilt claim counter for this sequence
+    for claim = 1:11;
         
-        %get model prediction for every seq position
-        pg=[];
-        q=0.6;
+%         claim_it = claim_it + 1;    %counter for index into raw
         
-        %get number of guilts (i.e., the number of 1s)
-        ng = sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+claim-1,8) );
-        %get number of draws so far
-        nd = claim-1;
+        if claim == 1;
+            
+            claim_it = seq_start_indices(seq);
+
+            model_behaviour(claim_it,1) = stimuli.prior*100;
+            model_behaviour(claim_it,2) = NaN;
+
+        else;
+            
+            claim_it = claim_it + 1;
+            
+            
+            %get model prediction for every seq position
+            pg=[];
+            q=0.6;
+            
+            %get number of guilts (i.e., the number of 1s)
+            if raw(claim_it,8) == 1;
+                ng = ng + 1;
+            end;
+%             ng = sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+claim-1,8) );
+            %get number of draws so far
+            nd = claim;
+            
+            %assign model probability
+            %         model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 +
+            %         (q/(1-q))^(nd-2*ng)))*100;    %original formula
+            %         model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100;
+            new_prior = model_behaviour(claim_it - 1,1)/100;
+            model_behaviour(claim_it,1) = (1/(1 + ((1-new_prior)/new_prior)*(q/(1-q))^(nd-2*ng)))*100;
+            %assign model adjustment
+            model_behaviour(claim_it,2) =  model_behaviour(claim_it-1,1) -  model_behaviour(claim_it,1);
+            
+        end;    %loop through claims for this sequence
         
-        %assign model probability 
-%         model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 +
-%         (q/(1-q))^(nd-2*ng)))*100;    %original formula
-        model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100; 
-        %assign model adjustment
-        model_behaviour(seq_start_indices(seq)+claim-1,2) =  model_behaviour(seq_start_indices(seq)+claim-1,1) -  model_behaviour(seq_start_indices(seq)+claim-2,1);
-   
     end;    %loop through this sequence (claim)
- 
+    
 end;    %loop through sequences
+
+fprintf('');
 
 
 
@@ -238,7 +263,7 @@ for seq = 1:numel(seq_start_indices);
     %I've reoganised, now 9: context degree 10: context category 11: model probability 12: adj humans 13: adj model 14: bias (human - model)
     
     probabilities(seq_start_indices,11) = 50;     %model would assume 50/50 chance (starting value), now fitted parameter
-
+    
     
     
     
@@ -277,19 +302,19 @@ for seq = 1:numel(seq_start_indices);
         ng = sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+claim-1,8) );
         %get number of draws so far
         nd = claim-1;
-%         
-%         if switch_majority == 1;
-%             
-%             %There's no column that codes for the "true" majority in this
-%             %updated code (it's always based on previous draws) so compute
-%             %it manually now
-%             if sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+10,8) ) < 5;    %If there are fewer than five guilts
-%                 
-%                 ng = nd - ng;
-%                 
-%             end;
-%             
-%         end;    %swicth majority
+        %
+        %         if switch_majority == 1;
+        %
+        %             %There's no column that codes for the "true" majority in this
+        %             %updated code (it's always based on previous draws) so compute
+        %             %it manually now
+        %             if sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+10,8) ) < 5;    %If there are fewer than five guilts
+        %
+        %                 ng = nd - ng;
+        %
+        %             end;
+        %
+        %         end;    %swicth majority
         
         %assign model probability to column 11
         raw(seq_start_indices(seq)+claim-1,11) = (1/(1 + (q/(1-q))^(nd-2*ng)))*100;
@@ -311,7 +336,7 @@ for seq = 1:numel(seq_start_indices);
         % %         end;
         
         
-        %4: human probs in 4 9: context degree 10: context category 11: model probability; 
+        %4: human probs in 4 9: context degree 10: context category 11: model probability;
         %NEW: 12: adj humans 13: adj model 14: bias (human - model)
         raw(seq_start_indices(seq)+claim-1,12) = raw(seq_start_indices(seq)+claim-1,4) - raw(seq_start_indices(seq)+claim-2,4);
         %model adjustments (original model probs in 10, model adjustments in 13)

@@ -21,7 +21,7 @@ stimuli.raw(nan_indices,9) = stimuli.raw(nan_indices+1,9);  %assign the missing 
 
 stimuli.prior = .5;
 stimuli.split = 0.6;
-stimuli.extra_guilts = -5;
+stimuli.extra_guilts = 5;
 stimuli.formula = 'stimuli.prior'; 
 % stimuli.formula = 'model_behaviour(seq_start_indices(seq)+claim-2,1)/100'; 
 % stimuli.formula = '1 - model_behaviour(seq_start_indices(seq)+claim-2,1)/100'; 
@@ -172,12 +172,12 @@ seq_start_indices = find(stimuli.raw(:,5)==0);
 for seq = 1:numel(seq_start_indices);
     
     %initialise model probabilities and adjustments
-    %     model_behaviour(seq_start_indices,1) = stimuli.prior*100;     %model assumes 50/50 chance
-%     model_behaviour(seq_start_indices,2) = NaN;
+    model_behaviour(seq_start_indices,1) = stimuli.prior*100;     %model assumes 50/50 chance
+    model_behaviour(seq_start_indices,2) = NaN; 
     
     
     %Loop through this sequence
-    for claim = 1:11;
+    for claim = 2:11;
         
         %get model prediction for every seq position
         pg=[];
@@ -188,22 +188,18 @@ for seq = 1:numel(seq_start_indices);
         %get number of draws so far
         nd = claim-1;
         
-        %assign model probability
-        %         model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 +
-        %         (q/(1-q))^(nd-2*ng)))*100;    %original formula
-        %         new_prior = 1 - model_behaviour(seq_start_indices(seq)+claim-2,1)/100;
+        %assign model probability 
+%         model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 +
+%         (q/(1-q))^(nd-2*ng)))*100;    %original formula
+%         new_prior = 1 - model_behaviour(seq_start_indices(seq)+claim-2,1)/100;
         new_prior = eval(stimuli.formula);
-        %         new_split = (q/(1-q))+stimuli.split_inc;
-        model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 + ((1-new_prior)/new_prior)*(q/(1-q))^(nd-2*ng)))*100;
+%         new_split = (q/(1-q))+stimuli.split_inc;
+        model_behaviour(seq_start_indices(seq)+claim-1,1) = (1/(1 + ((1-new_prior)/new_prior)*(q/(1-q))^(nd-2*ng)))*100; 
         %assign model adjustment
-        if claim == 1;
-            model_behaviour(seq_start_indices(seq)+claim-1,2) =  NaN;
-        else;
-            model_behaviour(seq_start_indices(seq)+claim-1,2) =  model_behaviour(seq_start_indices(seq)+claim-1,1) -  model_behaviour(seq_start_indices(seq)+claim-2,1);
-        end;
-        
+        model_behaviour(seq_start_indices(seq)+claim-1,2) =  model_behaviour(seq_start_indices(seq)+claim-1,1) -  model_behaviour(seq_start_indices(seq)+claim-2,1);
+   
     end;    %loop through this sequence (claim)
-    
+ 
 end;    %loop through sequences
 %%%%%%%%%%%%%%%%%%end, simulate%%%%%%%%%%%%%%%%%%%%%%
 

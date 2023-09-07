@@ -1,6 +1,11 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
 function forensic_beads_prior_sim;
 
+%forensic_beads_simulate_parameters: In order to clean up Git repository
+%for public consumption I've renamed this code and removed older versions.
+%This code allows one to play with prior and extra guilt and split
+%parameters and see effects on sequence position 
+
 %Gets conditional probabilities biased by subjective prior 
 
 

@@ -40,8 +40,8 @@ groupvars = {temp(:,1) temp(:,2)  temp(:,3)};   %suspect, context, seq pos
 
 %Loop through and plot probabilities at sequence positions for different suspects
 figure('Color',[1 1 1]);
-suspects = unique(means(:,1));
-contexts = unique(means(:,2));
+suspects = unique(means(:,1),'stable');
+contexts = unique(means(:,2),'stable');
 
 for suspect = 1:numel(suspects);
     for context = 1:numel(contexts);
@@ -68,8 +68,8 @@ groupvars = {temp(:,1) temp(:,2)};   %suspect, context, seq pos
 [means meancis] = grpstats(temp(:,[1 2 4]),groupvars,{'mean','meanci'});
 
 figure('Color',[1 1 1]);
-contexts = unique(means(:,1));
-claims = unique(means(:,2));
+contexts = unique(means(:,1),'stable');
+claims = unique(means(:,2),'stable');
 
 for context = 1:numel(contexts);
     for claim = 1:numel(claims);
@@ -229,7 +229,7 @@ fprintf('');
 
 %%%%%%%%%%%%%%%%%%start, fit_data%%%%%%%%%%%%%%%%%%%%%%
 function fit_data(stimuli);
-stimuli.num_subs = numel(unique(raw(:,2)));
+stimuli.num_subs = numel(unique(raw(:,2)),'stable');
 
 params = 0;
 
@@ -274,7 +274,7 @@ end;    %loop through seq starts
 
 
 
-num_subs = numel(unique(raw(:,2)));
+num_subs = numel(unique(raw(:,2)),'stable');
 
 %on which indices is the display screen 0 (prior rating prompt so first
 %rating

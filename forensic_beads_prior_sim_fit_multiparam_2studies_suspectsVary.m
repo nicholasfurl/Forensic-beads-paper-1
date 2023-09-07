@@ -1,6 +1,16 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
 function forensic_beads_prior_sim_fit_multiparam_2studies;
 
+%forensic_beads_prior_sim_fit_multiparam_2studies_suspectsVary.m modifies 
+%forensic_beads_prior_sim_fit_multiparam_2studies.m so that the prior
+%parameter can vary over suspects but other parameters are fitted one per
+%participant. This has no effect for Study 1, where suspect is already
+%manipulated between participant. But it (at least) prevents the respose noise from
+%explaining away variability in the prior in Study 2. It requires a rather
+%fundamental restructuring the the main fitting loop and functions so am
+%splitting off a new program and preserving the well-functioning versiuon
+%that fits all parameters separately for different suspects.
+
 %forensic_beads_prior_sim_fit_multiparam_2studies.m expands the version of 
 %forensic_beads_prior_sim_fit_multiparam.m that existed on 2/Sept/2023 to
 %integrate in Study 1 as well as Study 2 (which was the only one
@@ -52,9 +62,18 @@ num_participants = numel(participant_list);
 
 %initial value of free params
 params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-params(2) = 0;  %guilt claim increment, intitialised to optimal value
-params(3) = 0;  %bias term, intialised to optimal value
-params(4) = 1;  %noise term, initialised to optimal value
+params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+params(3) = 0;  %guilt claim increment, intitialised to optimal value
+params(4) = 0;  %bias term, intialised to optimal value
+params(5) = 1;  %noise term, initialised to optimal value
+
+lower_bounds = [0 0 0 0 0];   %fitting will not try parameters below these values
+upper_bounds = [1 1 Inf Inf 1];
+
+%indices into params that designate which are free. Handy way to play
+%around with models by changing parameterisation. "Initial" values in
+%params become hard coded if not indexed here.
+free_params_idx = [1 2 3 4 5];
 
 num_params = numel(params);
 
@@ -79,24 +98,28 @@ for participant = 1:num_participants;
     this_ps_suspect_codes = unique(rmmissing(this_ps_data(:,6)));     %get suspect codes present in this participant 
     this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
     
-    %Now loop through the detected conditions
-    for suspect = 1:this_ps_num_suspects;
+    disp(sprintf('fitting participant %d', participant))
+    
+    
+        %split free and fixed params
+        free_params = params(free_params_idx);
+%         fixed_params = params(setdiff(1:end,free_params_idx));
         
-        disp(sprintf('fitting participant %d suspect %d', participant, suspect))
+        free_lower_bounds = lower_bounds(free_params_idx);
+        free_upper_bounds = upper_bounds(free_params_idx);
         
-        %Get the probability rating data to fit for this suspect in this participant
-        %We can use the sequence position (5), the claim (8) and the rating itself (4)
-        this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:);
         
         %pass data, initialised param and function handle to fminsearch
-        %         [params_est(participant, this_ps_suspect_codes(suspect)+1,:) ll(participant, this_ps_suspect_codes(suspect)+1) flag search] = ...
         [params_temp, ll_temp, flag search] = ...
             fminsearchbnd( ...
-            @(params) get_model_ll(params, this_ps_suspect_data), ...
-            params, ...
-            [0 0 0 0], ...  %lower parameter bounds
-            [1 Inf Inf 1] ... %upper parameter bounds
+            @(free_params) get_model_ll_outer(free_params, params, free_params_idx, this_ps_suspect_data), ...
+            free_params, ...
+            free_lower_bounds, ...  %lower parameter bounds
+            free_upper_bounds ... %upper parameter bounds
             );
+    
+ 
+
         
         %Accumulate results for plotting
         
@@ -109,10 +132,12 @@ for participant = 1:num_participants;
             ];
         
         %get performance for this model
-        temp = get_model_behaviour(params_temp,this_ps_suspect_data);
+        params_performance = params;
+        params_performance(free_params_idx) = params_temp;
+        temp = get_model_behaviour(params_performance,this_ps_suspect_data);
         model_behaviour_results = [ model_behaviour_results; temp ];
             
-    end;    %loop through suspects
+%     end;    %loop through suspects
     
     save('test_fit_multiparam.m');
     
@@ -233,8 +258,6 @@ suspects_num = numel(suspects);
 %make suplots for each suspect
 for suspect = 1:suspects_num;
     
-    subplot(1,2,suspect);
-    
     this_suspect_data = mbr_disconfirm_means(mbr_disconfirm_means(:,6)==suspects(suspect),15);  %means
     this_suspect_ci = mbr_disconfirm_cis(mbr_disconfirm_means(:,6)==suspects(suspect),15,1) - this_suspect_data;  %means
     
@@ -243,10 +266,12 @@ for suspect = 1:suspects_num;
     
     input_struct.fig = h2;
     input_struct.sp = [1,2,suspect];
-    input_struct.input_means = param_means';
-    input_struct.input_ci = param_ci(:,:,1)'-param_means';
-    input_struct.xlabel = 'Parameter';
-    input_struct.ylabel = 'Parameter value';
+    input_struct.input_means = this_suspect_data';
+    input_struct.input_ci = this_suspect_ci'-this_suspect_data';
+    input_struct.xlabel = 'Claim Type';
+    input_struct.ylabel = 'Adjustment';
+    
+    b = make_grouped_bar_with_errors(input_struct);
 
     fprintf('');
     
@@ -259,51 +284,149 @@ end;
 
 
 disp('audi5000');
+%%%%%%%%%%%%%%%%%%end, forensic_beads_prior_sim_fit_multiparam_2studies%%%%%%%%%%%%%%%%%%%%%%
 
-%get participant averages
-cols_to_use = [11 8 2 13]; %context (ad hoc), claim, participant, adjustment
-groupvars = { stimuli.raw(:,cols_to_use(1)) stimuli.raw(:,cols_to_use(2)) stimuli.raw(:,cols_to_use(3)) stimuli.raw(:,cols_to_use(4))};   %suspect, context, sequence position, participants
-temp = grpstats(stimuli.raw(:,cols_to_use),groupvars,'mean');
 
-%get participant averages
-groupvars = {temp(:,1) temp(:,2)};   %suspect, context, seq pos
-[means meancis] = grpstats(temp(:,[1 2 4]),groupvars,{'mean','meanci'});
 
-figure('Color',[1 1 1]);
-contexts = unique(means(:,1));
-claims = unique(means(:,2));
 
-for context = 1:numel(contexts);
-    for claim = 1:numel(claims);
+
+
+
+%%%%%%%%%%%%%%%%%%start, get_model_ll_inner%%%%%%%%%%%%%%%%%%%%%%
+function ll = get_model_ll_inner(free_params, params, free_params_idx, this_ps_suspect_data);
+
+%This is intended to take suspect-specific data, and will fit ONLY prior as
+%a free parameter, inheriting the other parameters as fixed quantities from
+%above. 
+
+%params must be THREE elements, ONE PRIOR (takes only suspect-specific
+%data) and the disconfirmatory and noise parameters. These three can be
+%customised as fixed or free. 
+
+params(free_params_idx) = free_params;
+
+%this ps_suspect_data:
+%now the same as raw, but adds cols col 12: seq num, col 13: model rating
+this_ps_suspect_data = get_model_behaviour(params,this_ps_suspect_data);
+
+% %compute ll
+ll = get_likelihood(this_ps_suspect_data);
+%%%%%%%%%%%%%%%%%%start, get_model_ll_inner%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%start, get_model_ll_outer%%%%%%%%%%%%%%%%%%%%%%
+function ll = get_model_ll_outer(free_params,params, free_params_idx, this_ps_suspect_data);
+
+%*outer meant in practice to fit the
+%disconfirmatory parameter, and the response bias and noise parameters in
+%each individual participant, while running an inner search for the best
+%suspect parameters. So this will take all the data from a participant,
+%which is not suspect-specific, and will then loop through suspects and get
+%likelihoods.
+% 
+all_params(free_params_idx) = free_params;
+
+%Now loop through the detected conditions
+ll = 0;
+for suspect = 1:this_ps_num_suspects;
+    
+    
+    %Get the probability rating data to fit for this suspect in this participant
+    %We can use the sequence position (5), the claim (8) and the rating itself (4)
+    this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:);
+    
+    %It might be that you have not specified for the prior to be fit at all, in
+    %which case either suspect's prior will not be in the free parameter list
+    %and, moreover, you can skip the suspect-specific optimisation and proceed
+    %straight to generation of performance using the current tested parameters.
+    %You can't fit one suspect prior but not the other (so, &)
+    if sum(free_params_idx==1) > 0 & sum(free_params_idx==2) > 0;
         
-        this_data = means(means(:,1) == contexts(context),3);
-        %this_data_ci = meancis(means(:,6) == suspects(suspect),10,1);
-        plot(this_data); hold on;
+        %So the inner loop needs the list of all the parameters, but fits only
+        %the first or only the second suspect parameter plus the other (free) ones
+        free_params_idx = suspect;
+        params = [all_params(suspect) all_params(3:end)];   %The current free parameter value of the suspect prior tested in this suspect loop iteration and the other current values of parameters
+        [params_temp, ll_temp, flag search] = ...
+            fminsearchbnd( ...
+            @(free_params) get_model_ll_inner(free_params, params, free_params_idx, this_ps_suspect_data), ...
+            free_params, ...
+            free_lower_bounds, ...  %lower parameter bounds
+            free_upper_bounds ... %upper parameter bounds
+            );
         
-    end;    %contexts loop
-end;    %suspects loop
-ylim([-15 15]);
-xlim([0.5 2.5]);
-set(gca,'XTick',[1 2]);
-xticklabels({'innocent' 'guilty'});
-legend({'innocent context' 'guilty context'});
-xlabel('Claim');
-box off;
+    end;    %Do I need to optimise prior or should I proceed to generate behaviour with current priors?
+    
+    %this ps_suspect_data:
+    %now the same as raw, but adds cols col 12: seq num, col 13: model rating
+    this_ps_suspect_data = get_model_behaviour(params,this_ps_suspect_data);
+
+    % %compute ll (already comes out of the function as negative ll)
+    ll = ll + get_likelihood(this_ps_suspect_data);
+    
+end;    %loop through suspects
 
 fprintf('');
-%%%%%%%%%%%%%%%%%%end, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%end, get_model_ll%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+%%%%%%start, get likelihood%%%%%%%%%%%%%%%%%%%%%
+function ll = get_likelihood(this_ps_suspect_data);
+   
+ll = 0;
+for trial = 1:size(this_ps_suspect_data,1);
+
+    %model response noise and bias when generating predictions
+     y_hat = this_ps_suspect_data(trial,end)/100;   %end because model rating must be the last col
+    
+    %Get "labels" for this trial
+    y = this_ps_suspect_data(trial,4)/100;  %human / participant probability is col 4.
+
+    ll_this_trial = y*log(y_hat) + (1-y)*log(1-y_hat);
+    if ~isreal(ll_this_trial);
+        fprintf('');
+    end;
+    ll = ll - ll_this_trial;
+
+end;    %loop through trials
+%%%%%%start, get likelihood%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+
+
+
 
 
 
 
 %%%%%%%%%%%%%%%%%%start, get_model_ll%%%%%%%%%%%%%%%%%%%%%%
-function ll = get_model_ll(params,this_ps_suspect_data);
+function ll = get_model_ll_outer(free_params,params, free_params_idx, this_ps_suspect_data);
+
+%*outer meant in practice to fit the
+%disconfirmatory parameter, and the response bias and noise parameters in
+%each individual participant, while running an inner search for the best
+%suspect parameters
 
 % prior = params(1);
 
 % params_get_behav = params([1 2]);
 % params_bias = params(3);
 % params_noise = params(4);
+
+params(free_params_idx) = free_params;
 
 %this ps_suspect_data:
 %now the same as raw, but adds cols col 12: seq num, col 13: model rating
@@ -401,7 +524,7 @@ function sp_h = make_grouped_bar_with_errors(input_struct);
 
 figure(input_struct.fig);
 
-sp_h = subplot(input_struct.sp(1), input_struct.sp(1), input_struct.sp(1));
+sp_h = subplot(input_struct.sp(1), input_struct.sp(2), input_struct.sp(3));
 
 b = bar(input_struct.input_means,'grouped');
 hold on;
@@ -435,6 +558,12 @@ ylabel(input_struct.ylabel);
 %%%%%%%%%%%%%%%%%%start, get_model_behaviour%%%%%%%%%%%%%%%%%%%%%%
 function this_ps_suspect_data = get_model_behaviour(params, this_ps_suspect_data)
 
+%get_model_behaviour always takes three parameters, ONE prior for whatever
+%suspect is under consideration (only accepts suspect-specific datasets),
+%the disconfirmatory parameter (can be fixed to 1 if we want it "turned
+%off", the response bias and response noise parameters (respectively fixed
+%to 0 and 1 if we want them "turned off").
+
 prior = params(1);
 guilt_claim_inc = params(2);
 
@@ -463,20 +592,20 @@ for seq = 1:numel(seq_start_indices);
         %save sequence number so can loop more easily later
         this_ps_suspect_data(index,cols_this_ps_suspect_data+1) = seq;
         
-        if claim == 1
-            
-            this_ps_suspect_data(seq_start_indices(seq),cols_this_ps_suspect_data+2) = prior*100;
-            
-        else
+%         if claim == 1
+%             
+%             this_ps_suspect_data(seq_start_indices(seq),cols_this_ps_suspect_data+2) = prior*100;
+%             
+%         else
             
             %get model prediction for every seq position
             q=.6;
             
             %get number of guilts (i.e., the number of 1s)
-            ng = sum( this_ps_suspect_data(seq_start_indices(seq)+1:index,8) ) + guilt_claim_inc;
+            ng = sum( this_ps_suspect_data(seq_start_indices(seq)+1:index,8) ) ;
             
             %get number of draws so far
-            nd = claim-1;
+            nd = claim-1  + guilt_claim_inc;
             
             %assign model probability
             noiseless_p = (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100;
@@ -485,7 +614,7 @@ for seq = 1:numel(seq_start_indices);
             this_ps_suspect_data(index,cols_this_ps_suspect_data+2) = ...
                 params(3) + params(4)*noiseless_p;
             
-        end;    %before first claim (sequence position 0) or a later one?
+%         end;    %before first claim (sequence position 0) or a later one?
         
     end;    %loop through this sequence (claim)
     

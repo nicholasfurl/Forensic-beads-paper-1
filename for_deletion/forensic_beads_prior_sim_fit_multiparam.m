@@ -1,6 +1,8 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
 function forensic_beads_prior_sim_fit;
 
+%This version doesn't let you configure which parameters to use.
+
 %forensic_beads_prior_sim_fit_multiparam.m expands the version of 
 %forensic_beads_prior_sim_fit.m that existed on 2/Sept/2023 to introduce a
 %number of guilt claims increment parameter.

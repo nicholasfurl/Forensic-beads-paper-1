@@ -1,6 +1,12 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
 function forensic_beads_prior_sim_fit_multiparam_2studies;
 
+%This is the one you can use to either run Study 1 or run Study 2 such that
+%you have a separate set of all parameters fitted for each suspect. If you
+%want Study 2 where prior varies over suspects and the other parameters are
+%one fitted per participant, use
+%forensic_beads_prior_sim_fit_multiparam_study2.m
+
 %forensic_beads_prior_sim_fit_multiparam_2studies.m expands the version of 
 %forensic_beads_prior_sim_fit_multiparam.m that existed on 2/Sept/2023 to
 %integrate in Study 1 as well as Study 2 (which was the only one
@@ -16,6 +22,7 @@ function forensic_beads_prior_sim_fit_multiparam_2studies;
 %forensic_beads_prior_sim_fit.m - simulates conditional probabilities biased by subjective prior 
 
 addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\FMINSEARCHBND'))
+addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\klabhub-bayesFactor-3d1e8a5'))
 
 study_num_to_analyse = 1;   %Can be 1 for Study 1 (Atheism study) or 2 for Study 2 (gender study).
 
@@ -62,7 +69,7 @@ upper_bounds = [1 Inf Inf 1];
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
 %params become hard coded if not indexed here.
-free_params_idx = [1 3 4];
+free_params_idx = [1 2 3 4];
 
 num_params = numel(params);
 
@@ -75,7 +82,7 @@ model_behaviour_results = [];
 %initialise matrix to hold parameters. Ensure it is filled with NaNs first
 %so it's flexible enough to handle within (Study 2) or between (Study 1) participant
 %manipulations of suspect
-params_est = nan(num_participants,num_suspects,num_params);
+% params_est = nan(num_participants,num_suspects,num_params);
 ll = nan(num_participants,num_suspects);
 
 for participant = 1:num_participants;
@@ -93,7 +100,6 @@ for participant = 1:num_participants;
         disp(sprintf('fitting participant %d suspect %d', participant, suspect))
         
         %Get the probability rating data to fit for this suspect in this participant
-        %We can use the sequence position (5), the claim (8) and the rating itself (4)
         this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:);
         
         %split free and fixed params
@@ -102,8 +108,7 @@ for participant = 1:num_participants;
         
         free_lower_bounds = lower_bounds(free_params_idx);
         free_upper_bounds = upper_bounds(free_params_idx);
-        
-        
+
         %pass data, initialised param and function handle to fminsearch
         %         [params_est(participant, this_ps_suspect_codes(suspect)+1,:) ll(participant, this_ps_suspect_codes(suspect)+1) flag search] = ...
         [params_temp, ll_temp, flag search] = ...
@@ -164,23 +169,48 @@ model_behaviour_results = get_adjustments(model_behaviour_results);
 %parameters changes. Will need to make multiple plots / bars for the
 %different suspects.
 
-%groupby and mean aggregate by suspect code
-[param_means param_ci] = grpstats(model_fitting_results(:,4:end), {model_fitting_results(:,2)},{'mean', 'meanci'});
+%Some issues when there's only one col (e.g., only one paranmeter is estimated), as tends to happen with matlab
+parameter_values = model_fitting_results(:,4:end);
+num_params_test = size(parameter_values,2);
+
+%groupby and mean aggregate by suspect code:
+[param_means param_ci] = grpstats(parameter_values, {model_fitting_results(:,2)},{'mean', 'meanci'});
 
 %plot
 h1 = figure('Color',[1 1 1]);
 
 input_struct.fig = h1;
 input_struct.sp = [1,1,1];
-input_struct.input_means = param_means';
-input_struct.input_ci = param_ci(:,:,1)'-param_means';
+%make_grouped_bar_with_errors wants params in rows and suspects in cols
+if num_params_test == 1;
+    input_struct.input_means = param_means;
+    input_struct.input_ci = (param_ci(:,2)-param_means);
+else
+    input_struct.input_means = param_means';
+    input_struct.input_ci = param_ci(:,:,1)'-param_means';
+end;
 input_struct.xlabel = 'Parameter';
 input_struct.ylabel = 'Parameter value';
 
 b = make_grouped_bar_with_errors(input_struct);
 
+%trad paired t-test
+[th tpvals tci tstats] =   ...   
+    ttest2( ...
+    parameter_values(model_fitting_results(:,2)==0,1), ...
+    parameter_values(model_fitting_results(:,2)==1,1) ...
+    );
 
+%paired Bayesian test
+[bf10,bfpvals,bfci,bfstats] = ...
+        bf.ttest2( ...
+    parameter_values(model_fitting_results(:,2)==0,1), ...
+    parameter_values(model_fitting_results(:,2)==1,1) ...
+    );
+
+disp(sprintf('Suspect effect on prior: trad pval: %0.2f bf10: %7.4f',tpvals,bf10));
 %%%%%%%%%%%%%%PARAMETER PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 
 
@@ -189,8 +219,8 @@ b = make_grouped_bar_with_errors(input_struct);
 %model_behavioural results and codes for claims, contexts and suspects for each row
 %Can overlay line plots for different suspects
 %in different contexts in one plot. In another, I can plot claims *
-%contexts. 
-% 
+%contexts.
+%
 % %get participant averages
 cols_to_use = [6 9 5];  %suspect, context, seq pos
 groupvars = { ...
@@ -203,21 +233,57 @@ groupvars = { ...
 %now get means and ci's over participants
 
 %Loop through and plot probabilities at sequence positions for different suspects
+% cmap = lines(4);
+cmap = [0 0 0; 
+        0 0 0; 
+        .5 .5 .5;
+        .5 .5 .5
+        ];
 figure('Color',[1 1 1]);
-suspects = unique(means(:,6));
-contexts = unique(means(:,9));
 
+legend_labels = {'suspect 0, innocent sequence' 'suspect 0, guilty sequence' 'suspect 1, innocent sequence'  'suspect 1, guilty sequence'};
+
+suspects = unique(means(:,cols_to_use(1)));
+contexts = unique(means(:,cols_to_use(2)));
+
+cmap_it = 1;
 for suspect = 1:numel(suspects);
     for context = 1:numel(contexts);
         
-        this_data = means(means(:,6) == suspects(suspect) & means(:,9) == contexts(context),13);
+        this_data = means(means(:,cols_to_use(1)) == suspects(suspect) & means(:,cols_to_use(2)) == contexts(context),13);
+        this_cis = ...
+            meancis(meancis(:,cols_to_use(1)) == suspects(suspect) & meancis(:,cols_to_use(2)) == contexts(context),13,2) - this_data;
         %this_data_ci = meancis(means(:,6) == suspects(suspect),10,1);
-        plot(this_data); hold on;
+        
+        errorbar( ...
+            this_data, ...
+            this_cis, ...
+            'Color', cmap(cmap_it,:) ...
+            );
+        hold on;
+        plot( ...
+            this_data, ...
+            'Marker','o', ...
+            'Color', cmap(cmap_it,:) ...
+            );
+        
+        hold on;
+        
+        text(2,30-cmap_it*6,legend_labels{cmap_it},'Color',cmap(cmap_it,:));
+        
+        cmap_it = cmap_it + 1;
         
     end;    %contexts loop
 end;    %suspects loop
+
+
 ylim([1 100]);
 box off;
+%legend({'suspect 0, innocent sequence' 'suspect 1, innocent sequence' 'suspect 0, guilty sequence' 'suspect 1, guilty sequence'});
+xlabel('Sequence position');
+ylabel('Probability');
+
+fprintf('');
 %%%%%%%%%%%%%%SEQUENCE POSITION PLOT END%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -267,7 +333,8 @@ for suspect = 1:suspects_num;
     b = make_grouped_bar_with_errors(input_struct);
 
     fprintf('');
-    
+    legend({'innocent context' 'guilty context'});
+
     
 end;
 
@@ -425,6 +492,8 @@ function this_ps_suspect_data = get_model_behaviour(params, this_ps_suspect_data
 
 prior = params(1);
 guilt_claim_inc = params(2);
+response_bias = params(3);
+response_noise = params(4);
 
 %on which indices is the display screen 0 (prior rating prompt so first rating)
 seq_start_indices = find(this_ps_suspect_data(:,5)==0);
@@ -471,7 +540,7 @@ for seq = 1:numel(seq_start_indices);
                       
             %add noise and response bias
             this_ps_suspect_data(index,cols_this_ps_suspect_data+2) = ...
-                params(3) + params(4)*noiseless_p;
+                response_bias + response_noise*noiseless_p;
             
 %         end;    %before first claim (sequence position 0) or a later one?
         

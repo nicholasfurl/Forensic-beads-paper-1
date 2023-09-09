@@ -1,10 +1,7 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
 function forensic_beads_prior_sim_fit_multiparam_study2;
 
-%I've given up fighting with the code and multiplying its complexity to
-%accomodate one model that fits per suspects per participant (study 2) and
-%another that works for one suspect per partici[pant (study 1). Let's just
-%use forensic_beads_prior_sim_fit_multiparam.m for Study 1 and for Study 2
+%Let's just use forensic_beads_prior_sim_fit_multiparam_2studies.m for Study 1 and for Study 2
 %if you want to look at separate parameter fits for all parameters in the
 %different suspects. Use forensic_beads_prior_sim_fit_multiparam_study.m if
 %you want study 2 where suspect parameters vary over participants but
@@ -26,6 +23,7 @@ function forensic_beads_prior_sim_fit_multiparam_study2;
 %forensic_beads_prior_sim_fit.m - simulates conditional probabilities biased by subjective prior
 
 addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\FMINSEARCHBND'))
+addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\klabhub-bayesFactor-3d1e8a5'))
 
 % study_num_to_analyse = 2;   %Can be 1 for Study 1 (Atheism study) or 2 for Study 2 (gender study).
 
@@ -54,14 +52,14 @@ params(3) = 0;  %guilt claim increment, intitialised to optimal value
 params(4) = 0;  %bias term, intialised to optimal value
 params(5) = 1;  %noise term, initialised to optimal value
 
-lower_bounds = [0 0 0 0 0];   %fitting will not try parameters below these values
+lower_bounds = [0 0 -Inf 0 0];   %fitting will not try parameters below these values
 upper_bounds = [1 1 Inf Inf 1];
 
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
 %params become hard coded if not indexed here. Use empty array with ground
 %truth settings in params to get ideal observer.
-free_params_idx = [3];
+free_params_idx = [1:5];
 
 num_params = numel(params);
 
@@ -90,7 +88,7 @@ for participant = 1:num_participants;
     
     free_lower_bounds = lower_bounds(free_params_idx);
     free_upper_bounds = upper_bounds(free_params_idx);
- 
+    
     %pass data, initialised param and function handle to fminsearch
     [params_temp, ll_temp, flag search] = ...
         fminsearchbnd( ...
@@ -99,7 +97,7 @@ for participant = 1:num_participants;
         free_lower_bounds, ...  %lower parameter bounds
         free_upper_bounds ... %upper parameter bounds
         );
- 
+    
     %Now that this participant has been fit, get model performance
     %model_fitting_results:
     %col1: participant id, col2: suspect code, col3: ll, cols 4 to end: params
@@ -111,29 +109,36 @@ for participant = 1:num_participants;
     %get performance for this model
     %This needs to be divided by suspect, once for each of the
     %suspect-specific parameters,both of which are estimated on this loop
-       
+    
     %Accumulate results for plotting. Need to re-loop suspects if Study 2
     this_ps_suspect_codes = unique(rmmissing(this_ps_data(:,6)),'stable');     %get suspect codes present in this participant
     this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
     
-    for suspect = 1:this_ps_num_suspects;
+    for suspect = 1:this_ps_num_suspects;  %suspect is an iterator for the first and second suspect to consider in this loop
         
-        clear this_suspect_data
-        this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:); %should be same suspect-sepcific data as used to estiate parameter inside of fitting function above
-        params_performance = params;    %So this just initialises the params vector to be used with all the iniatalised (not fitted) values, as some of the paraneters will be fitted and some fixed
+        this_suspect = this_ps_suspect_codes(suspect);      %suspect code is whether it's (0 or 1) male or female and may or may not be the first iterated suspect.
+        
+        clear this_suspect_data params_performance
+        this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_suspect,:); %should be same suspect-sepcific data as used to estiate parameter inside of fitting function above
+        params_performance = params;    %So this just initialises the params vector to be used with all the initialised (not fitted) values, as some of the paraneters will be fitted and some fixed
         params_performance(free_params_idx) = params_temp;  %replace default parameter list with any updated free parameter values
-        params_performance = params_performance([suspect 3:end]); %Narrow down to just this suspect
+%         params_performance_hold = params_performance;    %for debugging purposes (adds parameters on to 14th col onwards)
+        params_performance = params_performance([this_ps_suspect_codes(suspect)+1 3:end]); %Narrow down to just this suspect
         temp = get_model_behaviour(params_performance,this_ps_suspect_data);
+%         temp = [temp repmat(params_performance_hold([1 2])*100,size(temp,1),1)];  %for debugging purposes (adds parameters on to 14th col onwards)
         model_behaviour_results = [ model_behaviour_results; temp ];
+        
+%         %for debugging
+%         if 
         
     end;    %loop through suspects
     
     %     save('test_fit_multiparam.m');
     
-    end;    %loop through participants
-    
-    %Before plotting, you need to compute human and model adjustments
-    %returns model_behaviour_results (each row is a sequence position):
+end;    %loop through participants
+
+%Before plotting, you need to compute human and model adjustments
+%returns model_behaviour_results (each row is a sequence position):
 %1: event index,
 %2:participant private id,
 %3:RT,
@@ -151,8 +156,27 @@ for participant = 1:num_participants;
 %15 model's adjustments
 model_behaviour_results = get_adjustments(model_behaviour_results);
 
-
-
+% %for debugging purposes
+% test = [ ...
+%     model_behaviour_results(model_behaviour_results(:,5)==0,6) ... %suspect
+%     model_behaviour_results(model_behaviour_results(:,5)==0,13:end) ... %model probs and prior params
+%     ];
+% 
+% mean(test)
+% 
+% test00 = [ ...
+%     model_behaviour_results(model_behaviour_results(:,5)==0 & model_behaviour_results(:,6)==0,6) ... %suspect
+%     model_behaviour_results(model_behaviour_results(:,5)==0 & model_behaviour_results(:,6)==0,13:end) ... %model probs and prior params
+%     ];
+% 
+% mean(test00)
+% 
+% test01 = [ ...
+%     model_behaviour_results(model_behaviour_results(:,5)==0 & model_behaviour_results(:,6)==1,6) ... %suspect
+%     model_behaviour_results(model_behaviour_results(:,5)==0 & model_behaviour_results(:,6)==1,13:end) ... %model probs and prior params
+%     ];
+% 
+% mean(test01)
 
 %%%%%%%%%%%%%%PARAMETER PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Alright, at this stage, I have estimated parameters in the columns of
@@ -178,6 +202,22 @@ input_struct.xlabel = 'Parameter';
 input_struct.ylabel = 'Parameter value';
 
 b = make_grouped_bar_with_errors(input_struct);
+
+%Run quick t-test to see if suspect gender has significant effect on prior
+
+%get (within-participant) differences between the two prior parameters
+prior_diffs = diff(model_fitting_results(:,3:4)')';
+
+%trad paired t-test
+[th tpvals tci tstats] =   ...   
+    ttest(prior_diffs);
+
+%paired Bayesian test
+[bf10,bfpvals,bfci,bfstats] = ...
+        bf.ttest( prior_diffs);
+
+disp(sprintf('Suspect effect on prior: trad pval: %0.2f bf10: %7.0f',tpvals,bf10));
+
 %%%%%%%%%%%%%%PARAMETER PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -201,21 +241,48 @@ groupvars = { ...
 %now get means and ci's over participants
 
 %Loop through and plot probabilities at sequence positions for different suspects
+cmap = [0 0 0; 
+        0 0 0; 
+        .5 .5 .5;
+        .5 .5 .5
+        ];
 figure('Color',[1 1 1]);
+
+legend_labels = {'suspect 0, innocent sequence' 'suspect 0, guilty sequence' 'suspect 1, innocent sequence'  'suspect 1, guilty sequence'};
+
 suspects = unique(means(:,6),'stable');
 contexts = unique(means(:,9),'stable');
 
+cmap_it = 1;
 for suspect = 1:numel(suspects);
     for context = 1:numel(contexts);
         
         this_data = means(means(:,6) == suspects(suspect) & means(:,9) == contexts(context),13);
-        %this_data_ci = meancis(means(:,6) == suspects(suspect),10,1);
-        plot(this_data); hold on;
+        this_cis = ...
+            meancis(meancis(:,6) == suspects(suspect) & meancis(:,9) == contexts(context),13,2) - this_data;
+        
+        errorbar( ...
+            this_data, ...
+            this_cis, ...
+            'Color', cmap(cmap_it,:) ...
+            );
+        hold on;
+        plot( ...
+            this_data, ...
+            'Marker','o', ...
+            'Color', cmap(cmap_it,:) ...
+            );
+        
+        text(2,30-cmap_it*6,legend_labels{cmap_it},'Color',cmap(cmap_it,:));
+        
+        cmap_it = cmap_it + 1;
         
     end;    %contexts loop
 end;    %suspects loop
 ylim([1 100]);
 box off;
+xlabel('Sequence position');
+ylabel('Probability');
 %%%%%%%%%%%%%%SEQUENCE POSITION PLOT END%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -236,24 +303,24 @@ adjustment_idx = 15;
 % cols_to_use = [context_idx claim_idx participant_idx adjustment_idx]; %context (ad hoc), claim, participant, adjustment
 % groupvars = { model_behaviour_results(:,cols_to_use(1)) model_behaviour_results(:,cols_to_use(2)) model_behaviour_results(:,cols_to_use(3)) };   %context, claim, participant
 % temp = grpstats(model_behaviour_results, groupvars,'mean');
-% 
+%
 % %get participant averages
 % % groupvars = {temp(:,1) temp(:,2)};   %suspect, context
 % groupvars = {temp(:,11) temp(:,8)};   %context, claim
 % [means meancis] = grpstats(temp,groupvars,{'mean','meanci'});
-% 
+%
 % figure('Color',[1 1 1]);
 % contexts = unique(means(:,11),'stable');
 % claims = unique(means(:,8),'stable');
-% 
+%
 % for context = 1:numel(contexts);
-%     
+%
 %     this_data = means(means(:,11) == contexts(context),15);
 %     %this_data_ci = meancis(means(:,6) == suspects(suspect),10,1);
 %     plot(this_data); hold on;
-%     
+%
 % end;    %contexts loop
-% 
+%
 % ylim([-15 15]);
 % xlim([0.5 2.5]);
 % set(gca,'XTick',[1 2]);
@@ -272,7 +339,7 @@ group_vars = { ...
     model_behaviour_results(:,suspect_idx), ...  %suspect
     model_behaviour_results(:,participant_idx), ...  %participant
     };
- 
+
 %collapse over sequence lengths
 mbr_collapse_seqpos = grpstats(model_behaviour_results,group_vars,'mean');
 %Now get means with confidence intervals computed over participants
@@ -306,7 +373,9 @@ for suspect = 1:suspects_num;
     input_struct.ylabel = 'Adjustment';
     
     b = make_grouped_bar_with_errors(input_struct);
-
+    
+    legend({'innocent context' 'guilty context'});
+    
 end;
 % %%%%%%%%%%%%%%DISCONFIRMATORY ADJUSTMENT PLOT END%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -332,10 +401,12 @@ ll = 0;
 %Now loop through the detected conditions
 for suspect = 1:this_ps_num_suspects;
     
-    this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:);
+    this_suspect = this_ps_suspect_codes(suspect);
+    
+    this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_suspect,:);
     
     %alter parameter list to be specific for this suspect
-    this_params = [params(suspect) params(3:end)];   %The current free parameter value of the suspect prior tested in this suspect loop iteration and the other current values of parameters
+    this_params = [params(this_suspect+1) params(3:end)];   %The current free parameter value of the suspect prior tested in this suspect loop iteration and the other current values of parameters
     %this ps_suspect_data:
     %now the same as raw, but adds cols col 12: seq num, col 13: model rating
     this_ps_suspect_data = get_model_behaviour(this_params,this_ps_suspect_data);

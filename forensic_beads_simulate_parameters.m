@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
-function forensic_beads_prior_sim;
+function forensic_beads_simulate_parameters;
 
 %forensic_beads_simulate_parameters: In order to clean up Git repository
 %for public consumption I've renamed this code and removed older versions.

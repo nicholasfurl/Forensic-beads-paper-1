@@ -69,7 +69,7 @@ upper_bounds = [1 Inf Inf 1];
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
 %params become hard coded if not indexed here.
-free_params_idx = [1 2];
+free_params_idx = [1 2 3 4];
 
 num_params = numel(params);
 
@@ -100,7 +100,6 @@ for participant = 1:num_participants;
         disp(sprintf('fitting participant %d suspect %d', participant, suspect))
         
         %Get the probability rating data to fit for this suspect in this participant
-        %We can use the sequence position (5), the claim (8) and the rating itself (4)
         this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:);
         
         %split free and fixed params
@@ -210,6 +209,36 @@ b = make_grouped_bar_with_errors(input_struct);
     );
 
 disp(sprintf('Suspect effect on prior: trad pval: %0.2f bf10: %7.4f',tpvals,bf10));
+
+
+%Ok now let's make a fancy kernel density plot for the pub
+cmap = [0 0 0;
+    .25 .25 .25
+    ];
+
+alphas = [0 .75];
+
+h1 = figure('Color',[1 1 1]);
+
+for suspect = 1:2;  %suspect parameters loop
+
+    %Kernel density
+    [kernel(:,suspect) xi(:,suspect)] = ksdensity(model_fitting_results(:,2+suspect)); 
+    plot_shaded(xi(:,suspect),kernel(:,suspect),'Alpha',alphas(suspect),'Color',cmap(suspect,:),'LineWidth',2);
+    hold on;
+
+%     %binned histogram
+%      plot_histogram_shaded(model_fitting_results(:,2+suspect),'bins',25,'alpha',alphas(suspect),'color',cmap(suspect,:));
+
+    
+end;    %suspect parameters loop
+
+box off;
+xlabel('Estimated prior parameter value');
+ylabel('Probability (kernel) density');
+
+
+
 %%%%%%%%%%%%%%PARAMETER PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -281,6 +310,8 @@ end;    %suspects loop
 ylim([1 100]);
 box off;
 %legend({'suspect 0, innocent sequence' 'suspect 1, innocent sequence' 'suspect 0, guilty sequence' 'suspect 1, guilty sequence'});
+xlabel('Sequence position');
+ylabel('Probability');
 
 fprintf('');
 %%%%%%%%%%%%%%SEQUENCE POSITION PLOT END%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

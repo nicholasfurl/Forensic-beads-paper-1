@@ -25,8 +25,8 @@ stimuli.raw(nan_indices,9) = stimuli.raw(nan_indices+1,9);  %assign the missing 
     get_contexts(stimuli);
 
 stimuli.prior = .5;
-stimuli.split = 0.6;
-stimuli.extra_guilts = -5;
+stimuli.split = 0.8;
+stimuli.extra_guilts = 0;
 stimuli.formula = 'stimuli.prior'; 
 % stimuli.formula = 'model_behaviour(seq_start_indices(seq)+claim-2,1)/100'; 
 % stimuli.formula = '1 - model_behaviour(seq_start_indices(seq)+claim-2,1)/100'; 
@@ -82,14 +82,14 @@ contexts = unique(means(:,11),'stable');
 claims = unique(means(:,8),'stable');
 
 for context = 1:numel(contexts);
-    for claim = 1:numel(claims);
+%     for claim = 1:numel(claims);
         
         this_data = means(means(:,11) == contexts(context),13);
         %this_data_ci = meancis(means(:,6) == suspects(suspect),10,1);
         plot(this_data); hold on;
         
     end;    %contexts loop
-end;    %suspects loop
+% end;    %suspects loop
 ylim([-15 15]);
 xlim([0.5 2.5]);
 set(gca,'XTick',[1 2]);

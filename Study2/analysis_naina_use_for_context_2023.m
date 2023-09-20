@@ -101,7 +101,7 @@ for seq = 1:numel(seq_start_indices);
         
         %get model prediction for every seq position
         pg=[];
-        q=0.6;
+        q=0.7;
         
         %get number of guilts (i.e., the number of 1s)
         ng = sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+claim-1,8) );

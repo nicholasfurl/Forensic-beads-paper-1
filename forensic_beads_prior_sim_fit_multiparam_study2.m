@@ -54,8 +54,8 @@ params(4) = 0;  %bias term, intialised to optimal value
 params(5) = 1;  %noise term, initialised to optimal value
 params(6) = 0;  %guilt claim * guilt context interaction term. 
 
-lower_bounds = [0 0 -Inf 0 0 0];   %fitting will not try parameters below these values
-upper_bounds = [1 1 Inf Inf 1 25];
+lower_bounds = [0 0 -Inf -Inf -Inf 0];   %fitting will not try parameters below these values
+upper_bounds = [1 1 Inf Inf Inf 100];
 
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
@@ -602,7 +602,7 @@ for seq = 1:numel(seq_start_indices);
         %         else
         
         %get model prediction for every seq position
-        q=.6;
+        q=.7;
         
         %get number of guilts (i.e., the number of 1s)
         ng = sum( this_ps_suspect_data(seq_start_indices(seq)+1:index,8) )   + guilt_claim_inc;

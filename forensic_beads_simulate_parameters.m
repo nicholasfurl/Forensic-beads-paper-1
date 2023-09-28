@@ -25,7 +25,7 @@ stimuli.raw(nan_indices,9) = stimuli.raw(nan_indices+1,9);  %assign the missing 
     get_contexts(stimuli);
 
 stimuli.prior = .5;
-stimuli.split = 0.8;
+stimuli.split = 0.6;
 stimuli.extra_guilts = 0;
 stimuli.formula = 'stimuli.prior'; 
 % stimuli.formula = 'model_behaviour(seq_start_indices(seq)+claim-2,1)/100'; 

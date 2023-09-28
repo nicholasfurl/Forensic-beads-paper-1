@@ -46,8 +46,6 @@ study_num_to_analyse = 1;   %Can be 1 for Study 1 (Atheism study) or 2 for Study
 %11 preceding context (category)
 stimuli.raw = get_sub_data(study_num_to_analyse);
 
-
-%
 % %In raw, sequence positions 0 have NaNs in place of condition labels
 % %for contexts (col 9) and sometimes suspects (col 6). Put
 % %them back in or you'll have troubles later
@@ -69,15 +67,15 @@ params(2) = 0;  %guilt claim increment, intitialised to optimal value
 params(3) = 0;  %bias term, intialised to optimal value
 params(4) = 1;  %noise term, initialised to optimal value
 params(5) = 0;  %interaction term (weight on amount of confirmation). Starting value of 0 is the optimal value.
-params(6) = .8;    %split term, initialised to optimal value
+params(6) = .6;    %split term, initialised to optimal value
 
-lower_bounds = [0 0 0   0 -Inf .7];   %fitting will not try parameters below these values
-upper_bounds = [1 0 Inf 1  Inf .7];
+lower_bounds = [.5 0 0 1 0 .6];   %fitting will not try parameters below these values
+upper_bounds = [.5 0 0 1  0 6];
 
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
 %params become hard coded if not indexed here.
-free_params_idx = [];
+free_params_idx = [1 3 4 5 6];
 
 num_params = numel(params);
 
@@ -91,7 +89,7 @@ model_behaviour_results = [];
 %so it's flexible enough to handle within (Study 2) or between (Study 1) participant
 %manipulations of suspect
 % params_est = nan(num_participants,num_suspects,num_params);
-ll = nan(num_participants,num_suspects);
+% ll = nan(num_participants,num_suspects);
 
 for participant = 1:num_participants;
     
@@ -495,7 +493,7 @@ disp('audi5000');
 
 
 %%%%%%%%%%%%%%%%%%start, get_model_ll%%%%%%%%%%%%%%%%%%%%%%
-function ll = get_model_ll(free_params,params, free_params_idx, this_ps_suspect_data);
+function loss = get_model_ll(free_params,params, free_params_idx, this_ps_suspect_data);
 
 % prior = params(1);
 
@@ -509,19 +507,28 @@ params(free_params_idx) = free_params;
 %now the same as raw, but adds cols col 12: seq num, col 13: model rating
 this_ps_suspect_data = get_model_behaviour(params,this_ps_suspect_data);
 
-ll = 0;
+loss = 0;
 for trial = 1:size(this_ps_suspect_data,1);
     
-    y_hat = this_ps_suspect_data(trial,end)/100;   %end because model rating must be the last col    
-    y = this_ps_suspect_data(trial,4)/100;  %human / participant probability is col 4.
-    ll_this_trial = y*log(y_hat+eps) + (1-y)*log(1-y_hat+eps);
+    y_hat = this_ps_suspect_data(trial,end);   %end because model rating must be the last col    
+    y = this_ps_suspect_data(trial,4);  %human / participant probability is col 4.
     
-    if ~isreal(ll_this_trial);
-        disp('imaginary ll');
-        fprintf('');
+    if isnan(y_hat);
+        continue
     end;
     
-    ll = ll - ll_this_trial;
+    %squared error loss
+    loss = loss + (y_hat - y)^2;
+    
+    %log likelihood loss (I think)
+%     ll_this_trial = y*log(y_hat+eps) + (1-y)*log(1-y_hat+eps);
+%     
+%     if ~isreal(ll_this_trial);
+%         disp('imaginary ll');
+%         fprintf('');
+%     end;
+%     
+%     ll = ll - ll_this_trial;
     
 end;    %loop through trials
 fprintf('');
@@ -817,14 +824,19 @@ for seq = 1:numel(seq_start_indices);
             else; G_claim = 1;
             end;
             
-            this_context = this_ps_suspect_data(index,10) - .5; %-.5 if fully innocent, 0 if ambiguous, .5 is full guilty context
+            %binarised measure of context
+            %this_context = this_ps_suspect_data(index,10) - .5; %-.5 if fully innocent, 0 if ambiguous, .5 is full guilty context
+            %binarised measure of preceding context
+            this_context = this_ps_suspect_data(index,11);
             
-            interactTerm = I_claim*this_context - G_claim*this_context;   %claim * preceding context interaction
+            interactTerm = I_claim*this_context;   %claim * preceding context interaction
+%             interactTerm = I_claim*this_context - G_claim*this_context;   %claim * preceding context interaction
+
             %             interactTerm = this_context;   %claim * preceding context interaction
 
 %             interactTerm = ng;   %claim * preceding context interaction
         end;
-        
+ 
         %assign model probability
         %             noiseless_p = ( (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100 ) + (interaction*ng);
         noiseless_p = ( (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng))) ) + (interaction*interactTerm); %free parameter is weight on context*claim interaction

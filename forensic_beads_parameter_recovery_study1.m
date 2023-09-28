@@ -1,5 +1,7 @@
 %%%%%%%%%%%%%%%%%%start, forensic_beads_parameter_recovery%%%%%%%%%%%%%%%%%%%%%%
-function forensic_beads_parameter_recovery_study1;
+function forensic_beads_parameter_recovery_study1_v2;
+
+%v2 switches loss to squared error and attempts to recover split parameter
 
 %forensic_beads_parameter_recovery.m simulates data using stimuli from
 %study 1 and a range of prior, response bias, response noise and interaction
@@ -63,18 +65,18 @@ claims = data.raw(:,8);
 data = table(stimuli,suspect,seq_pos,claims);
 
 %generate the preceding context column
-
-% %Make lists of configured parameters
-config_prior = linspace(0,1,4);
-config_interaction = linspace(0,50,4);
-config_response_bias = linspace(0,1,4);
-config_response_noise = linspace(0,1,4);
+% 
+% % %Make lists of configured parameters
+% config_prior = linspace(0,1,4);
+% config_split = linspace(.6,.1,1);
+% config_response_bias = linspace(0,1,4);
+% config_response_noise = linspace(0,1,4);
 
 % % % %smaller list, for debugging
-% config_prior = [.4 .6];
-% config_interaction = [1 5 15];
-% config_response_bias = [0 1];
-% config_response_noise = [.75 1];
+config_prior = [.4 .6];
+config_split = [.5 .6 .7 .8 .9];
+config_response_bias = [0 1];
+config_response_noise = [.75 1];
 
 lower_bounds = [0 0 0 0 ];   %fitting will not try parameters below these values
 upper_bounds = [1 50 Inf 1];
@@ -84,7 +86,7 @@ it = 1;
 
 num_params = numel(lower_bounds);
 num_priors = numel(config_prior);
-num_interacts = numel(config_interaction);
+num_interacts = numel(config_split);
 num_biases = numel(config_response_bias);
 num_noises = numel(config_response_noise);
 total_params = num_priors*num_interacts*num_biases*num_noises;
@@ -107,7 +109,7 @@ fitted_probabilities = NaN(num_priors, num_interacts, num_biases, num_noises,num
 
 %Run model fitting for each parameter level for each stimulus
 for prior = 1:num_priors;
-    for interaction = 1:num_interacts
+    for split = 1:num_interacts
         for bias = 1:num_biases;
             for noise = 1:num_noises;
                 
@@ -115,7 +117,7 @@ for prior = 1:num_priors;
                 it = it+1;
                 
                 params(1) = config_prior(prior);
-                params(2) = config_interaction(interaction);
+                params(2) = config_split(split);
                 params(3) = config_response_bias(bias);
                 params(4) = config_response_noise(noise);
                 
@@ -131,21 +133,21 @@ for prior = 1:num_priors;
                     this_stim_data = data(data.stimuli==stim(stimulus),:);
 
                     %save for analysis and comparison to fitted_params later
-                    configured_params(prior,interaction,bias,noise,stimulus,:) = params;
+                    configured_params(prior,split,bias,noise,stimulus,:) = params;
                     
                     %Generate behavioural data from this configuration of parameters
-                    configured_probabilities(prior, interaction, bias, noise,stimulus,:) = ...
+                    configured_probabilities(prior, split, bias, noise,stimulus,:) = ...
                         get_model_behaviour(params, this_stim_data);
                     
                     %setup dataset for fitting
                     clear data_to_fit;
                     data_to_fit.data = this_stim_data;
                     data_to_fit.configured_probabilities = ...
-                        squeeze(configured_probabilities(prior, interaction, bias, noise,stimulus,:));
+                        squeeze(configured_probabilities(prior, split, bias, noise,stimulus,:));
                     
                     %now fit new parameters to the behaviour generated from these "stimuli"
                     options = optimset('MaxFunEvals',1500);
-                    [fitted_params(prior,interaction,bias,noise,stimulus,:), ...
+                    [fitted_params(prior,split,bias,noise,stimulus,:), ...
                         ll_temp, flag search] = ...
                         fminsearchbnd( ...
                         @(params) get_model_ll(params, data_to_fit), ...
@@ -156,15 +158,15 @@ for prior = 1:num_priors;
                         );
                     
                     %Generate behavioural data from these fitted parameters
-                    fitted_probabilities(prior, interaction, bias, noise,stimulus,:) = ...
+                    fitted_probabilities(prior, split, bias, noise,stimulus,:) = ...
                         get_model_behaviour( ...
-                        fitted_params(prior,interaction,bias,noise,stimulus,:), ...
+                        fitted_params(prior,split,bias,noise,stimulus,:), ...
                         data_to_fit.data);
                     
                 end;    %stimuli / participants
                 
             end;    %priors
-        end;    %interactions
+        end;    %splits
     end;    %biases
 end;    %noise
 
@@ -179,7 +181,7 @@ f1 = figure('Color',[1 1 1]);
 % subplot(1,2,1);
 hm_param = heatmap(R_params, 'Colormap', cool, 'ColorbarVisible', 'on',  'XLabel', 'Fitted parameters' , 'YLabel', 'Configured parameters');
 hm_param.CellLabelFormat = '%2.2f';
-ticklabels = {'Prior', 'Interaction', 'Bias', 'Noise'};
+ticklabels = {'Prior', 'split', 'Bias', 'Noise'};
 hm_param.XDisplayLabels = ticklabels;
 hm_param.YDisplayLabels = ticklabels;
 caxis([-1, 1]);
@@ -189,7 +191,7 @@ caxis([-1, 1]);
 % subplot(1,2,2);
 % hm_param = heatmap(R_probs, 'Colormap', cool, 'ColorbarVisible', 'on',  'XLabel', 'Fitted parameters' , 'YLabel', 'Configured parameters');
 % hm_param.CellLabelFormat = '%2.2f';
-% ticklabels = {'Prior', 'Interaction', 'Bias', 'Noise'};
+% ticklabels = {'Prior', 'split', 'Bias', 'Noise'};
 % hm_param.XDisplayLabels = ticklabels;
 % hm_param.YDisplayLabels = ticklabels;
 %  caxis([-1, 1]);
@@ -201,6 +203,17 @@ caxis([-1, 1]);
     );
 
 disp(sprintf('Correlation between fitted and configured probability ratings: r = %0.4f p = %0.4f',R_probs,p_probs));
+
+
+%Make plots of recovered parameter values
+f2 = figure('Color',[1 1 1]);
+for param=1:num_params;
+    
+    fprintf('');
+    
+end;    %loop through the different params to make a plot of each
+
+
 
 disp('audi5000');
 %%%%%%%%%%%%%%%%%%end, forensic_beads_parameter_recovery%%%%%%%%%%%%%%%%%%%%%%
@@ -345,7 +358,7 @@ end;    %loop seq starts
 function probabilities = get_model_behaviour(params, this_ps_suspect_data)
 
 prior = params(1);
-interaction = params(2);
+split = params(2);
 response_bias = params(3);
 response_noise = params(4);
 
@@ -378,7 +391,7 @@ for seq = 1:numel(seq_start_indices);
         %         else
         
         %get model prediction for every seq position
-        q=.6;
+        q=split;
         
         %get number of guilts (i.e., the number of 1s)
         ng = sum( this_ps_suspect_data.claims(seq_start_indices(seq)+1:index) ) ;
@@ -386,18 +399,19 @@ for seq = 1:numel(seq_start_indices);
         %get number of draws so far
         nd = claim-1;
         
-        %             %interaction term
-        this_claim = sum(this_ps_suspect_data.claims(index));  %guilt or innocent claim now?
-        if isnan(this_claim);   %first rating in sequence, before any witnesses
-            interactTerm = 0;   %no contribution of interaction yet
-        else;
-            interactTerm = this_claim*ng;   %claim * preceding context interaction
-        end;
+%         %             %split term
+%         this_claim = sum(this_ps_suspect_data.claims(index));  %guilt or innocent claim now?
+%         if isnan(this_claim);   %first rating in sequence, before any witnesses
+%             interactTerm = 0;   %no contribution of interaction yet
+%         else;
+%             interactTerm = this_claim*ng;   %claim * preceding context interaction
+%         end;
         
         %assign model probability
         %             noiseless_p = ( (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100 ) + (interaction*ng);
-        noiseless_p = ( (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100 ) + (interaction*interactTerm); %free parameter is weight on context*claim interaction
-        
+%         noiseless_p = ( (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100 ) + (interaction*interactTerm); %free parameter is weight on context*claim interaction
+               noiseless_p = ( (1/(1 + ((1-prior)/prior)*(q/(1-q))^(nd-2*ng)))*100 ); %free parameter is weight on context*claim interaction
+ 
         
         %add noise and response bias
         probabilities(index,1) = ...

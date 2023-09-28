@@ -69,8 +69,8 @@ params(3) = 0;  %bias term, intialised to optimal value
 params(4) = 1;  %noise term, initialised to optimal value
 params(5) = 0;  %interaction term (weight on amount of confirmation). Starting value of 0 is the optimal value.
 
-lower_bounds = [0 0 0 0 1];   %fitting will not try parameters below these values
-upper_bounds = [1 0 Inf 1 50];
+lower_bounds = [.5 0 0 1 0];   %fitting will not try parameters below these values
+upper_bounds = [.5 0 0 1 0];
 
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
@@ -103,7 +103,7 @@ for participant = 1:num_participants;
     %Now loop through the detected conditions
     for suspect = 1:this_ps_num_suspects;
         
-        disp(sprintf('fitting participant %d suspect %d', participant, suspect))
+%         disp(sprintf('fitting participant %d suspect %d', participant, suspect))
         
         %Get the probability rating data to fit for this suspect in this participant
         this_ps_suspect_data = this_ps_data(this_ps_data(:,6) == this_ps_suspect_codes(suspect),:);

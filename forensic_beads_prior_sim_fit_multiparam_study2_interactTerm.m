@@ -54,8 +54,8 @@ params(4) = 0;  %bias term, intialised to optimal value
 params(5) = 1;  %noise term, initialised to optimal value
 params(6) = 0;  %guilt claim * guilt context interaction term. 
 
-lower_bounds = [0 0 0 0 0 0];   %fitting will not try parameters below these values
-upper_bounds = [1 1 0 Inf 1 50];
+lower_bounds = [.5 .5 0 0 1 0];   %fitting will not try parameters below these values
+upper_bounds = lower_bounds;
 
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in

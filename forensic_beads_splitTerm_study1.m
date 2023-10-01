@@ -69,13 +69,13 @@ params(4) = 1;  %noise term, initialised to optimal value
 params(5) = 0;  %interaction term (weight on amount of confirmation). Starting value of 0 is the optimal value.
 params(6) = .6;    %split term, initialised to optimal value
 
-lower_bounds = [.5 0 0 1 0 .6];   %fitting will not try parameters below these values
-upper_bounds = [.5 0 0 1  0 6];
+lower_bounds = [0 0 -Inf 0 0 .5];   %fitting will not try parameters below these values
+upper_bounds = [1 0 Inf 1 0 1];
 
 %indices into params that designate which are free. Handy way to play
 %around with models by changing parameterisation. "Initial" values in
 %params become hard coded if not indexed here.
-free_params_idx = [1 3 4 5 6];
+free_params_idx = [1 3 4 6];
 
 num_params = numel(params);
 

@@ -2,8 +2,8 @@
 function forensic_beads_splitTerm_study1_simplify;
 
 %Fits a probability estimation model to human probability estimates with
-%prior, split, bias and noise parameters. Works for study 1 and study 2
-%(but fits separate four-param models to each participant).
+%prior, split, bias and noise parameters. Fits separate four-param models 
+%to each participant.
 
 %forensic_beads_splitTerm_study1_simplify, is forensic_beads_splitTerm_study1
 %But I've done some rewriting and gone through line by line looking for bugs, improvements
@@ -16,26 +16,21 @@ addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-p
 
 %Setable stuff!
 
-%Can be 1 for Study 1 (Atheism study) or 2 for Study 2 (gender study).
-study_num_to_analyse = 1;
-
 %initial value of free params
 params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-params(2) = 0;  %bias term, intialised to optimal value
-params(3) = 1;  %noise term, initialised to optimal value
-params(4) = .6;    %split term, initialised to optimal value
+params(2) = .6;    %split term, initialised to optimal value
+params(3) = 0;  %bias term, intialised to optimal value
+params(4) = 1;  %noise term, initialised to optimal value
 
 %fitted parameters constrained to be between these values
 %technically all params will be free, but you can fix some by forcing their
 %range to be one value only.
-% lower_bounds = [0 -Inf 0 .5];
-% upper_bounds = [1 Inf 1 1];
+% lower_bounds = [0 .5 -Inf 0];
+% upper_bounds = [1  1  Inf 1];
 
-%ideal observer (Study 1)
-% lower_bounds = [params(1) params(2) params(3) params(4)];
-% upper_bounds =lower_bounds;
-lower_bounds = [params(1) params(2) params(3) .5];
-upper_bounds = [params(1)  params(2) params(3) 1];
+%If you wantr to simulate ideal observer performance with fixed params
+lower_bounds = [params(1) params(2) params(3) params(4)];
+upper_bounds = lower_bounds;
 
 %1: event index,
 %2:participant private id,
@@ -67,18 +62,19 @@ var_names = ...
     };
 data = ...   %assign data to struct
     array2table( ...    %convert imported data to table
-    get_sub_data(study_num_to_analyse), ... %import data
+    get_sub_data, ... %import data
     'VariableNames', var_names ...
     );
 
 %Who are the participants?
-participant_list = unique(data.Pid,'stable'); %automatically sorted ascending
+participant_list = unique(data.Pid,'stable');   %Vitally important participant num order is maintained or it'll get mismatched with results arrays later!!!
 num_participants = numel(participant_list);
 
 %initialise table to hold modelling results
 var_names = {'Pid','Suspect','Loss','Prior','Split','Bias','Noise'};
 model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
-%initialise vector to hold probabilities
+
+%initialise vector to hold model's probabilities
 model_behaviour_results = [];
 
 for participant = 1:num_participants;
@@ -91,7 +87,7 @@ for participant = 1:num_participants;
         data.Pid == participant_list(participant),...
         :);
     
-    %This participant might have both suspects (Study 2) or just one (Study 1)
+    %This code now does only Study 1 so this should always return two suspects: 0 and 1
     this_ps_suspect_codes = unique(rmmissing(this_ps_data.Suspect));     %get suspect codes present in this participant
     this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
     
@@ -106,7 +102,7 @@ for participant = 1:num_participants;
         this_ps_suspect_data = ...
             this_ps_data(this_ps_data.Suspect == this_ps_suspect_codes(suspect),:);
         
-        %fit param to data.
+        %fit params to data.
         options = optimset('MaxFunEvals',10000);
         [new_params, new_loss, flag search] = ...
             fminsearchbnd( ...
@@ -117,7 +113,7 @@ for participant = 1:num_participants;
             options ...
             );
         
-        %save paramater fitting output (see line before loop for col names)
+        %save parameter fitting output (see line before loop for col names)
         model_fitting_results = ...
             [model_fitting_results; ...
             num2cell([participant_list(participant) this_ps_suspect_codes(suspect) new_loss new_params])
@@ -132,10 +128,9 @@ for participant = 1:num_participants;
         
     end;    %loop through suspects
     
-    save('fb_fit_study1_simpler.m');
-    
 end;    %loop through participants
 
+save('fb_fit_study1_simpler.m');
 
 %Add the accumulated model probabilities as column of data table
 data.ModelProbability = model_behaviour_results;
@@ -252,7 +247,7 @@ for suspect = 1:suspects_num;
     input_struct.input_ci = this_suspect_ci';
     input_struct.xlabel = 'Claim Type';
     input_struct.ylabel = 'Adjustment';
-    input_struct.ylim = [0 12];
+    input_struct.ylim = [-15 15];
     
     b = make_grouped_bar_with_errors(input_struct);
     legend({'innocent context' 'guilty context'});
@@ -296,7 +291,7 @@ for suspect = 1:suspects_num;
     input_struct.input_ci = this_suspect_ci';
     input_struct.xlabel = 'Claim Type';
     input_struct.ylabel = 'Adjustment';
-    input_struct.ylim = [0 12];
+    input_struct.ylim = [-15 15];
     
     b = make_grouped_bar_with_errors(input_struct);
     legend({'innocent context' 'guilty context'});
@@ -321,13 +316,12 @@ cmap = [0 0 0;
 
 figure('Color',[1 1 1]);
 
-% legend_labels = {'suspect 0, innocent sequence' 'suspect 0, guilty sequence' 'suspect 1, innocent sequence'  'suspect 1, guilty sequence'};
 legend_labels = {'Suspect 0' 'Suspect 1'};
 
 %get data to plot
 
-%I wouldn't need to use two steps where I group by participant first for
-%study 1, but I'd need to if I wanted to do Study 2.
+% %I wouldn't need to use two steps where I group by participant first for
+% %study 1, but I'd need to if I wanted to do Study 2.
 temp = grpstats(data,{'Suspect', 'Context','SequencePosition','Pid'},{'mean'});
 
 %Now collapse over participant too, getting ci's over P's as we go
@@ -388,7 +382,7 @@ end;    %contexts loop
 
 
 
-%%%%%%%%%%%%%%MAKER KERNEL DISTS BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%MAKE KERNEL DISTS BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function make_kernel_dists(model_fitting_results);
 
 cmap = [0 0 0;
@@ -419,13 +413,13 @@ end;    %suspect parameters loop
 box off
 xlabel('Estimated prior parameter value');
 ylabel('Probability (kernel) density');
-%%%%%%%%%%%%%%MAKER KERNEL DISTS ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%MAKE KERNEL DISTS ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
 
-%%%%%%%%%%%%%%PARAMETER PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%MAKE_PARAMETER_PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function make_parameter_plot(model_fitting_results);
 
 %average by suspect code:
@@ -478,7 +472,18 @@ input_struct.ylim = [0 5000];
 
 b = make_grouped_bar_with_errors(input_struct);
 
-%%%%%%%%%%%%%%PARAMETER PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%While I'm at it, get the grand standard deviation of the residuals for use
+%in parameter recovery
+
+%average all rows (sequences / one sequence per participant)
+model_fitting_results.residual = sqrt( model_fitting_results.Loss );
+model_fitting_results.Ones = ones(size(model_fitting_results,1),1);
+stds = grpstats(model_fitting_results, 'Ones',{'std'});
+
+disp(sprintf('std of all residuals is: %4.4f',stds.std_residual));
+
+
+%%%%%%%%%%%%%%MAKE_PARAMETER_PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
@@ -495,7 +500,7 @@ loss = 0;
 for trial = 1:size(this_ps_suspect_data,1);
     
     %squared error loss
-    y_hat = fitted_probabilities(trial,end);   %end because model rating must be the last col
+    y_hat = fitted_probabilities(trial,end);
     y = this_ps_suspect_data.HumanProbability(trial,1);  %human / participant probability is col 4.
     loss = loss + (y_hat - y)^2;
     
@@ -610,13 +615,12 @@ for sequence=1:size(seq_starts,1); %for every start of a sequence
     this_sequence_claims_cumsum = cumsum( this_sequence_claims);
     this_sequence_claims_cumpro = this_sequence_claims_cumsum./[1:10]';
     %save proportions to array called raw
-    contexts(seq_starts(sequence,1):seq_starts(sequence,1)+10,1) = [.5; .5; this_sequence_claims_cumpro(1:9,:)]; %CONTEXT DEGREE
+    contexts(seq_starts(sequence,1):seq_starts(sequence,1)+10,1) = [NaN; NaN; this_sequence_claims_cumpro(1:9,:)]; %CONTEXT DEGREE
     
     
     %%%Now do stuff that depends on seq position. Use clunky if/then to
     %%%find if each position's cum proportion is classified as mostly
-    %%%guilty (=1) or innocent (=0) or neither (NaN)(raw col 10). Also, find model prob (raw col 11), human adjustment (raw col 12) and
-    %%%model adjustment (raw col 13)
+    %%%guilty (=1) or innocent (=0) or neither (NaN)(raw col 10).
     temp_MG = NaN(11,1);    %This will hold MG/MI classifications, which are NaN by default if unclassifiable
     temp_prob_model = NaN(11,1);
     for position = 1:9; %9, because the last position doesn't give a context to any folling claim / rating so should be left off
@@ -639,9 +643,9 @@ end;    %loop seq starts
 
 
 %%%%%%%%%start, get_sub_data%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function data = get_sub_data(study_num_to_analyse);
+function data = get_sub_data;
 
-if study_num_to_analyse == 1;
+% if study_num_to_analyse == 1;
     
     fnames = {...
         'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\01_christi_mostly_innoce.xlsx'...
@@ -673,23 +677,23 @@ if study_num_to_analyse == 1;
     end;    %Loop through datafiles (file)
     
     
-    
-elseif study_num_to_analyse == 2;
-    
-    %data_trunc.xlsx, I formated from data_exp_11596-v23_task-mwjx (1).csv,
-    %which Naina acquired from the Gorilla box for this part of the study flowchart.
-    %1: event index,
-    %2:participant private id,
-    %3:RT,
-    %4: human probability
-    %5: sequence position (which witness is it?)
-    %6: suspect gender (1=female),
-    %7:witness gender (1=female),
-    %8: guilty claim (1=guilty),
-    %9: context (mostly innocent / mostly guilty)
-    data = xlsread('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study2\data_trunc.xlsx');
-    
-end;    %Which study's dataset?
+%     
+% elseif study_num_to_analyse == 2;
+%     
+%     %data_trunc.xlsx, I formated from data_exp_11596-v23_task-mwjx (1).csv,
+%     %which Naina acquired from the Gorilla box for this part of the study flowchart.
+%     %1: event index,
+%     %2:participant private id,
+%     %3:RT,
+%     %4: human probability
+%     %5: sequence position (which witness is it?)
+%     %6: suspect gender (1=female),
+%     %7:witness gender (1=female),
+%     %8: guilty claim (1=guilty),
+%     %9: context (mostly innocent / mostly guilty)
+%     data = xlsread('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study2\data_trunc.xlsx');
+%     
+% end;    %Which study's dataset?
 
 
 %In raw, sequence positions 0 have NaNs in place of condition labels
@@ -718,9 +722,9 @@ data(nan_indices,6) = data(nan_indices+1,6);  %assign the missing values at pos 
 function model_probabilities = get_model_behaviour(params, this_ps_suspect_data)
 
 prior = params(1);
-response_bias = params(2);
-response_noise = params(3);
-split = params (4);
+split = params(2);
+response_bias = params(3);
+response_noise = params(4);
 
 %on which indices is the display screen 0 (prior rating prompt so first rating)
 seq_start_indices = find(this_ps_suspect_data.SequencePosition==0);
@@ -762,8 +766,7 @@ for seq = 1:numel(seq_start_indices);
     end;    %loop through this sequence (claim)
     
 end;    %loop through sequences
-fprintf('');
-%%%%%%%%%%%%%%%%%%end, simulate%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%end, get_model_behaviour%%%%%%%%%%%%%%%%%%%%%%
 
 
 

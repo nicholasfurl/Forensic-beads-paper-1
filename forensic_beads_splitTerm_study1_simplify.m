@@ -2,7 +2,7 @@
 function forensic_beads_splitTerm_study1_simplify;
 
 %Fits a probability estimation model to human probability estimates with
-%prior, split, bias and noise parameters. Fits separate four-param models 
+%prior, split, bias and noise parameters. Fits separate four-param models
 %to each participant.
 
 %forensic_beads_splitTerm_study1_simplify, is forensic_beads_splitTerm_study1
@@ -25,12 +25,12 @@ params(4) = 1;  %noise term, initialised to optimal value
 %fitted parameters constrained to be between these values
 %technically all params will be free, but you can fix some by forcing their
 %range to be one value only.
-% lower_bounds = [0 .5 -Inf 0];
-% upper_bounds = [1  1  Inf 1];
+lower_bounds = [0 .5 0 0];
+upper_bounds = [1  1 1 1];
 
 %If you wantr to simulate ideal observer performance with fixed params
-lower_bounds = [params(1) params(2) params(3) params(4)];
-upper_bounds = lower_bounds;
+% lower_bounds = [params(1) params(2) params(3) params(4)];
+% upper_bounds = lower_bounds;
 
 %1: event index,
 %2:participant private id,
@@ -79,34 +79,21 @@ model_behaviour_results = [];
 
 for participant = 1:num_participants;
     
-    clear this_ps_data this_ps_suspect_codes this_ps_num_suspects;
+    clear this_ps_data new_params new_loss;
     
     %get data for this participant
     this_ps_data = ...
         data( ...
         data.Pid == participant_list(participant),...
         :);
-    
-    %This code now does only Study 1 so this should always return two suspects: 0 and 1
-    this_ps_suspect_codes = unique(rmmissing(this_ps_data.Suspect));     %get suspect codes present in this participant
-    this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
-    
-    %Now loop through the detected conditions
-    for suspect = 1:this_ps_num_suspects;
-        
-        clear this_ps_suspect_data new_params new_loss;
-        
-        disp(sprintf('fitting participant %d suspect %d', participant, suspect))
-        
-        %Get the probability rating data to fit for this suspect in this participant
-        this_ps_suspect_data = ...
-            this_ps_data(this_ps_data.Suspect == this_ps_suspect_codes(suspect),:);
+ 
+        disp(sprintf('fitting participant %d', participant));
         
         %fit params to data.
         options = optimset('MaxFunEvals',10000);
         [new_params, new_loss, flag search] = ...
             fminsearchbnd( ...
-            @(params) get_model_loss(params, this_ps_suspect_data), ...
+            @(params) get_model_loss(params, this_ps_data), ...
             params, ...
             lower_bounds, ...  %lower parameter bounds
             upper_bounds, ... %upper parameter bounds
@@ -114,19 +101,21 @@ for participant = 1:num_participants;
             );
         
         %save parameter fitting output (see line before loop for col names)
+        %We can just fit all data for each participant and take suspect
+        %from first row of participant data here because in study 1, we
+        %know every participant sees one suspect.
         model_fitting_results = ...
             [model_fitting_results; ...
-            num2cell([participant_list(participant) this_ps_suspect_codes(suspect) new_loss new_params])
+            num2cell([participant_list(participant) this_ps_data.Suspect(1) new_loss new_params])
             ];
-        
         
         %get performance for this model
         model_behaviour_results = [ ...
             model_behaviour_results; ...
-            get_model_behaviour(new_params,this_ps_suspect_data)*100 ...
+            get_model_behaviour(new_params,this_ps_data)*100 ...
             ];
         
-    end;    %loop through suspects
+%     end;    %loop through suspects
     
 end;    %loop through participants
 
@@ -202,7 +191,7 @@ suspects_num = numel(suspects);
 subplot_it = 1;
 titles = {'Model suspect 0', 'Human suspect 0' 'Model suspect 1', 'Human suspect 1' };
 for suspect = 1:suspects_num;
-
+    
     %indices for getting plot data (just to be organised)
     this_suspect_indices = means.Suspect==suspects(suspect);
     
@@ -239,7 +228,7 @@ for suspect = 1:suspects_num;
     %setup plot
     input_struct.fig = h2;
     
-    input_struct.sp = [2,2,subplot_it]; 
+    input_struct.sp = [2,2,subplot_it];
     input_struct.title = titles{subplot_it};
     subplot_it = subplot_it + 1;
     
@@ -251,7 +240,7 @@ for suspect = 1:suspects_num;
     
     b = make_grouped_bar_with_errors(input_struct);
     legend({'innocent context' 'guilty context'});
- 
+    
     %HUMAN PLOT
     
     clear this_suspect_data this_suspect_ci input_struct;
@@ -283,7 +272,7 @@ for suspect = 1:suspects_num;
     %setup plot
     input_struct.fig = h2;
     
-    input_struct.sp = [2,2,subplot_it]; 
+    input_struct.sp = [2,2,subplot_it];
     input_struct.title = titles{subplot_it};
     subplot_it = subplot_it + 1;
     
@@ -295,7 +284,7 @@ for suspect = 1:suspects_num;
     
     b = make_grouped_bar_with_errors(input_struct);
     legend({'innocent context' 'guilty context'});
-   
+    
 end;    %Loop through suspects
 %%%%%%%%%%%%%%DISCONFIRMATORY ADJUSTMENT PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -645,56 +634,34 @@ end;    %loop seq starts
 %%%%%%%%%start, get_sub_data%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function data = get_sub_data;
 
-% if study_num_to_analyse == 1;
+fnames = {...
+    'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\01_christi_mostly_innoce.xlsx'...
+    'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\02_atheist_mostly_innoce.xlsx'...
+    'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\03_christi_mostly_guilty.xlsx'...
+    'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\04_atheist_mostly_guilty.xlsx'...
+    };
+sus_rel_codes = [1 0 1 0];
+context_codes = [0 0 1 1];
+data = [];
+for file = 1:4;
     
-    fnames = {...
-        'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\01_christi_mostly_innoce.xlsx'...
-        'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\02_atheist_mostly_innoce.xlsx'...
-        'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\03_christi_mostly_guilty.xlsx'...
-        'C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study1\04_atheist_mostly_guilty.xlsx'...
-        };
-    sus_rel_codes = [1 0 1 0];
-    context_codes = [0 0 1 1];
-    data = [];
-    for file = 1:4;
-        
-        clear temp;
-        temp = xlsread(fnames{file});
-        
-        data = [...
-            data;
-            temp(:,6) ...                                   %1: event index
-            temp(:,1) ...                                   %2: participant private id
-            temp(:,2) ...                                   %3: RT
-            temp(:,3) ...                                   %4: probability estimate
-            repmat([0:10]',size(temp,1)/11 ,1) ...          %5: sequence position (including prior 0-10)
-            sus_rel_codes(file)*ones(size(temp,1),1) ...    %6: suspect religion (0=Atheist)
-            temp(:,5) ...                                   %7: witness gender (1=female)
-            temp(:,4) ...                                   %8: witness claim (1=guilt)
-            context_codes(file)*ones(size(temp,1),1) ...    %9: context (1=mosty guilty)
-            ];
-        
-    end;    %Loop through datafiles (file)
+    clear temp;
+    temp = xlsread(fnames{file});
     
+    data = [...
+        data;
+        temp(:,6) ...                                   %1: event index
+        temp(:,1) ...                                   %2: participant private id
+        temp(:,2) ...                                   %3: RT
+        temp(:,3) ...                                   %4: probability estimate
+        repmat([0:10]',size(temp,1)/11 ,1) ...          %5: sequence position (including prior 0-10)
+        sus_rel_codes(file)*ones(size(temp,1),1) ...    %6: suspect religion (0=Atheist)
+        temp(:,5) ...                                   %7: witness gender (1=female)
+        temp(:,4) ...                                   %8: witness claim (1=guilt)
+        context_codes(file)*ones(size(temp,1),1) ...    %9: context (1=mosty guilty)
+        ];
     
-%     
-% elseif study_num_to_analyse == 2;
-%     
-%     %data_trunc.xlsx, I formated from data_exp_11596-v23_task-mwjx (1).csv,
-%     %which Naina acquired from the Gorilla box for this part of the study flowchart.
-%     %1: event index,
-%     %2:participant private id,
-%     %3:RT,
-%     %4: human probability
-%     %5: sequence position (which witness is it?)
-%     %6: suspect gender (1=female),
-%     %7:witness gender (1=female),
-%     %8: guilty claim (1=guilty),
-%     %9: context (mostly innocent / mostly guilty)
-%     data = xlsread('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\Study2\data_trunc.xlsx');
-%     
-% end;    %Which study's dataset?
-
+end;    %Loop through datafiles (file)
 
 %In raw, sequence positions 0 have NaNs in place of condition labels
 %for contexts (col 9) and sometimes suspects (col 6). Put

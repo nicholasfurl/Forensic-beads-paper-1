@@ -33,16 +33,22 @@ claims = data.raw(:,8);
 data = table(stimuli,seq_pos,claims);
 
 %Make lists of configured parametersp
-config_prior = linspace(0,1,4);
-config_split = linspace(.6,.9,4);
-config_response_bias = linspace(0,1,4);
-config_response_noise = linspace(0,1,4);
+% config_prior = linspace(0,1,4);
+% config_split = linspace(.6,.9,4);
+% config_response_bias = linspace(0,1,4);
+% config_response_noise = linspace(0,1,4);
 
 %smaller list, for debugging
-% config_prior = [.4 .6];
-% config_split = [.6 .8];
-% config_response_bias = [.4 .8];
-% config_response_noise = [.4 .8];
+config_prior = [.4 .6];
+config_split = [.6 .8];
+config_response_bias = [.4 .8];
+config_response_noise = [.4 .8];
+
+%EVEN smaller list, for debugging
+% config_prior = [.6];
+% config_split = [.8];
+% config_response_bias = [.2];
+% config_response_noise = [.8];
 
 lower_bounds = [0 .5 0 0];   %fitting will not try parameters outside these values
 upper_bounds = [1  1 1 1];
@@ -110,7 +116,7 @@ for prior = 1:num_priors;
                     
                     %now fit new parameters to the behaviour generated from these "stimuli"
                     options = optimset('MaxFunEvals',1500);
-                    [fitted_params(prior,split,bias,noise,stimulus,:), ...
+                    [new_params, ...
                         loss_temp, flag search] = ...
                         fminsearchbnd( ...
                         @(params) get_model_loss(params, data_to_fit), ...
@@ -120,11 +126,12 @@ for prior = 1:num_priors;
                         options ...
                         );
                     
+                    fitted_params(prior,split,bias,noise,stimulus,:) = new_params;
+                    
                     %Generate behavioural data from these fitted parameters
-                    fitted_probabilities(prior, split, bias, noise,stimulus,:) = ...
-                        get_model_behaviour( ...
-                        fitted_params(prior,split,bias,noise,stimulus,:), ...
-                        data_to_fit.data)*100;
+                    %get performance for this model
+                    fitted_probabilities(prior, split, bias, noise,stimulus,:) =  ...
+                        get_model_behaviour(new_params,this_stim_data)*100;
                     
                 end;    %stimuli / participants
                 
@@ -189,13 +196,14 @@ for param=1:num_params
         sw = .05;
         handles = plotSpread(this_data ...
             ,'xValues',x_data ...
-            ,'distributionColors',[.5 .5 .5] ...
+            ,'distributionColors',[.75 .75 .75] ...
             ,'distributionMarkers','.' ...
             , 'spreadWidth', sw ...
             );
         
         f_a = .1;
         these_levels_barwidth = mean(diff(these_levels))/2;
+        if isnan(these_levels_barwidth); these_levels_barwidth = 1; end;
         bar(x_data,x_data ...
             ,'FaceColor',[0 0 0] ...
             ,'FaceAlpha',f_a ...
@@ -206,7 +214,7 @@ for param=1:num_params
     end;    %param level
     set(gca,'XTick',these_levels)
     ylabel(ticklabels{param});
-    xlim([min(these_levels)-these_levels_barwidth*2 max(these_levels)+these_levels_barwidth*2])
+    xlim([min(these_levels)-these_levels_barwidth*2     max(these_levels)+these_levels_barwidth*2])
     ylim([0 1]);
 end;    %loop through the different params to make a plot of each
 
@@ -327,7 +335,8 @@ for seq = 1:numel(seq_start_indices);
         noise_p =        response_bias + response_noise*noiseless_p;
         
         %add some Gaussian noise, using std of the residuals of model fitting
-        std_resid = 39.27;
+%         std_resid = (39.27)/100;
+        std_resid = 0;
         noise_p = noise_p + randn(1,1)*std_resid;
         
         %Make sure probability stays between 0 and 1

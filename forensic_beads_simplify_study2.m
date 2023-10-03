@@ -12,6 +12,8 @@ addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-p
 %%%%%%
 %Set-able stuff!
 
+ideal_observer = 0;    %set tpo one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
+
 %initial value of free params
 params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
 params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
@@ -19,15 +21,22 @@ params(3) = .7;  %split term, initialised to optimal value
 params(4) = 0;  %bias term, intialised to optimal value
 params(5) = 1;  %noise term, initialised to optimal value
 
-%fitted parameters constrained to be between these values
-%technically all params will be free, but you can fix some by forcing their
-%range to be one value only.
-lower_bounds = [0 0 0 0 .5];
-upper_bounds = [1 1 1 1  1];
+if ideal_observer == 1;
+    
+    %If you wantr to simulate ideal observer performance with fixed params
+    lower_bounds = [params(1) params(2) params(3) params(4) params(5)];
+    upper_bounds =lower_bounds;
+    
+else;
+    
+    %fitted parameters constrained to be between these values
+    %technically all params will be free, but you can fix some by forcing their
+    %range to be one value only.
+    lower_bounds = [0 0 0 0 .5];
+    upper_bounds = [1 1 1 1  1];
+    
+end;
 
-%If you wantr to simulate ideal observer performance with fixed params
-% lower_bounds = [params(1) params(2) params(3) params(4) params(5)];
-% upper_bounds =lower_bounds;
 
 %%%%%%%%
 %Now get data ....
@@ -61,6 +70,8 @@ data = ...   %assign data to struct
     get_sub_data, ... %import data
     'VariableNames', var_names ...
     );
+
+data = sortrows(data,{'Pid','Suspect','Context'});
 
 %Who are the participants?
 participant_list = unique(data.Pid,'stable');    %Vitally important participant num order is maintained or it'll get mismatched with results arrays later!!!
@@ -114,38 +125,7 @@ for participant = 1:num_participants;
         model_behaviour_results;
         get_behaviour_for_this_ps_sequences(this_ps_data,new_params) ...
         ];
-    
-    
-    
-    
-    
-    
-%     this_ps_suspect_codes = unique(rmmissing(this_ps_data.Suspect),'stable');     %get suspect codes present in this participant
-%     this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
-%     
-%     for suspect = 1:this_ps_num_suspects;  %suspect is an iterator for the first and second suspect to consider in this loop
-%         
-%         clear this_ps_suspect_data this_params;
-%         
-%         %Get the probability rating data to fit for this suspect in this participant
-%         this_ps_suspect_data = ...
-%             this_ps_data(this_ps_data.Suspect == this_ps_suspect_codes(suspect),:);
-%         
-%         %alter parameter list to be specific for this suspect
-%         this_params = [new_params(suspect) new_params(3:end)];   %The current free parameter value of the suspect prior tested in this suspect loop iteration and the other current values of parameters
-%         
-%         %get performance for this model
-%         model_behaviour_results = [ ...
-%             model_behaviour_results; ...
-%             [get_model_behaviour(this_params,this_ps_suspect_data)*100, ...
-%             this_ps_suspect_data.Pid, ...
-%             this_ps_suspect_data.SequencePosition, ...
-%             this_ps_suspect_data.Suspect, ...
-%             this_ps_suspect_data.Context] ...
-%             ];
-%         
-%     end;    %loop through suspects
-    
+
 end;    %loop through participants
 
 %Add the accumulated model probabilities as column of data table
@@ -233,7 +213,7 @@ for seq = 1:numel(seq_start_indices);
    
 end;    %seq: loop through this participant's sequences
 
-%%%%%%%%%%%%%BEGIN get_behaviour_for_this_ps_sequences%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%END get_behaviour_for_this_ps_sequences%%%%%%%%%%%%%%%%
 
 
 
@@ -556,37 +536,42 @@ ylabel('Probability (kernel) density');
 %%%%%%%%%%%%%%%%%%start, get_model_loss%%%%%%%%%%%%%%%%%%%%%%
 function loss = get_model_loss(params, this_ps_data);
 
-%Get suspects (Should return two suspects: 0 and 1
-this_ps_suspect_codes = unique(rmmissing(this_ps_data.Suspect));     %get suspect codes present in this participant
-this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
+fitted_probabilities = ...
+    get_behaviour_for_this_ps_sequences(this_ps_data,params);
 
-loss = 0;
-%Now loop through suspects
-for suspect = 1:this_ps_num_suspects;
-    
-    %Get the probability rating data to fit for this suspect in this participant
-    this_ps_suspect_data = ...
-        this_ps_data(this_ps_data.Suspect == this_ps_suspect_codes(suspect),:);
-    
-    %alter parameter list to be specific for this suspect
-    this_params = [params(suspect) params(3:end)];   %The current free parameter value of the suspect prior tested in this suspect loop iteration and the other current values of parameters
-    
-    %Behaviour for this suspect, using suspect-specific prior and the other parameters shared between participants
-    %Returns proportions so multiply by 100 to compare against human probabilities
-    fitted_probabilities = ...
-        get_model_behaviour(this_params,this_ps_suspect_data)*100;
+
+% %Get suspects (Should return two suspects: 0 and 1
+% this_ps_suspect_codes = unique(rmmissing(this_ps_data.Suspect));     %get suspect codes present in this participant
+% this_ps_num_suspects = numel(this_ps_suspect_codes);              %How many codes for this participant?
+% 
+% loss = 0;
+% %Now loop through suspects
+% for suspect = 1:this_ps_num_suspects;
+%     
+%     %Get the probability rating data to fit for this suspect in this participant
+%     this_ps_suspect_data = ...
+%         this_ps_data(this_ps_data.Suspect == this_ps_suspect_codes(suspect),:);
+%     
+%     %alter parameter list to be specific for this suspect
+%     this_params = [params(suspect) params(3:end)];   %The current free parameter value of the suspect prior tested in this suspect loop iteration and the other current values of parameters
+%     
+%     %Behaviour for this suspect, using suspect-specific prior and the other parameters shared between participants
+%     %Returns proportions so multiply by 100 to compare against human probabilities
+%     fitted_probabilities = ...
+%         get_model_behaviour(this_params,this_ps_suspect_data)*100;
     
     %Loop through the trials (claims) for this suspect
-    for trial = 1:size(this_ps_suspect_data,1);
+    loss = 0;
+    for trial = 1:size(this_ps_data,1);
         
         %squared error loss, accumulating over both suspects
         y_hat = fitted_probabilities(trial,end);
-        y = this_ps_suspect_data.HumanProbability(trial,1);  %human / participant probability is col 4.
+        y = this_ps_data.HumanProbability(trial,1);  %human / participant probability is col 4.
         loss = loss + (y_hat - y)^2;
         
     end;    %loop through trials, this suspect
     
-end;    %loop through the two suspects
+% end;    %loop through the two suspects
 %%%%%%%%%%%%%%%%%%end, get_model_loss%%%%%%%%%%%%%%%%%%%%%%
 
 

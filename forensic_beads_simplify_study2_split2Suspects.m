@@ -1,5 +1,8 @@
-%%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
-function forensic_beads_simplify_study2;
+%%%%%%%%%%%%%%%%%%start, forensic_beads_simplify_study2_split2Suspects%%%%%%%%%%%%%%%%%%%%%%
+function forensic_beads_simplify_study2_split2Suspects;
+
+%In forensic_beads_simplify_study2_split2Suspects, prior and split vary
+%by suspect but the two response parameters do not
 
 %Fits a probability estimation model to human probability estimates with
 %prior, split, bias and noise parameters. For each participant, fits split
@@ -12,19 +15,22 @@ addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-p
 %%%%%%
 %Set-able stuff!
 
-ideal_observer = 0;    %set to one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
+ideal_observer = 0;    %set tpo one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
 
 %initial value of free params
 params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
 params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
 params(3) = .7;  %split term, initialised to optimal value
-params(4) = 0;  %bias term, intialised to optimal value
-params(5) = 1;  %noise term, initialised to optimal value
+params(4) = .7;  %split term, initialised to optimal value
+params(5) = 0;  %bias term, intialised to optimal value
+% params(6) = 0;  %bias term, intialised to optimal value
+params(6) = 1;  %noise term, initialised to optimal value
+% params(8) = 1;  %noise term, intialised to optimal value
 
 if ideal_observer == 1;
     
     %If you wantr to simulate ideal observer performance with fixed params
-    lower_bounds = [params(1) params(2) params(3) params(4) params(5)];
+    lower_bounds = [params(1) params(2) params(3) params(4) params(5) params(6)];
     upper_bounds =lower_bounds;
     
 else;
@@ -32,8 +38,10 @@ else;
     %fitted parameters constrained to be between these values
     %technically all params will be free, but you can fix some by forcing their
     %range to be one value only.
-    lower_bounds = [0 0 0 0 .5];
-    upper_bounds = [1 1 1 1  1];
+    lower_bounds = [0 0 .5 .5 0 0];
+    upper_bounds = [1 1  1  1 1 1];
+    %     lower_bounds = [0 0 .5 .5 0 0 1 1];
+    %     upper_bounds = [1 1  1  1 0 0 1 1];
     
 end;
 
@@ -78,7 +86,8 @@ participant_list = unique(data.Pid,'stable');    %Vitally important participant 
 num_participants = numel(participant_list);
 
 %initialise data matrix to hold modelling results
-var_names = {'Pid','Loss','PriorMale','PriorFemale','Split','Bias','Noise'};
+% var_names = {'Pid','Loss','PriorMale','PriorFemale','SplitMale','SplitFemale','BiasMale','BiasFemale','NoiseMale','NoiseFemale'};
+var_names = {'Pid','Loss','PriorMale','PriorFemale','SplitMale','SplitFemale','Bias','Noise'};
 
 %initialise table to hold modelling results
 model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
@@ -167,7 +176,7 @@ plot_sequence_behaviour(data);
 plot_adjustments(data);
 
 disp('audi5000');
-%%%%%%%%%%%%%%%%%%end, forensic_beads_simplify_study2%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%end, forensic_beads_simplify_study2_split2Suspects%%%%%%%%%%%%%%%%%%%%%%
 
 
 
@@ -198,7 +207,8 @@ for seq = 1:numel(seq_start_indices);
     this_suspect_code = this_ps_data.Suspect(seq_start_indices(seq));
     
     %modify param vector to pick out the prior for this sequences suspect
-    this_params = [new_params(this_suspect_code+1) new_params(3:end)];
+%     this_params = [new_params(this_suspect_code+1) new_params(this_suspect_code + 3) new_params(this_suspect_code + 5) new_params(this_suspect_code + 7)];
+    this_params = [new_params(this_suspect_code+1) new_params(this_suspect_code + 3) new_params(5:end)];
     
     %Get data for this one sequence
     this_seq_data = this_ps_data( seq_start_indices(seq):seq_start_indices(seq)+10, :);
@@ -443,17 +453,24 @@ input_struct.sp = [1,2,1];
 input_struct.input_means = ...
     [param_means.mean_PriorMale',
     param_means.mean_PriorFemale',
-    param_means.mean_Split',
+    param_means.mean_SplitMale',
+    param_means.mean_SplitFemale,
     param_means.mean_Bias',
     param_means.mean_Noise'];
+%     param_means.mean_BiasMale',
+%     param_means.mean_NoiseMale',
+
 
 input_struct.input_ci = ...
-    [param_means.meanci_PriorMale(:,2)'
+    [param_means.meanci_PriorMale(:,2)',
     param_means.meanci_PriorFemale(:,2)',
-    param_means.meanci_Split(:,2)'
-    param_means.meanci_Bias(:,2)'
+    param_means.meanci_SplitMale(:,2)',
+    param_means.meanci_SplitFemale(:,2)',
+    param_means.meanci_Bias(:,2)',
     param_means.meanci_Noise(:,2)'] - ...
     input_struct.input_means;
+%     param_means.meanci_BiasFemale(:,2)',
+%     param_means.meanci_NoiseMale(:,2)',
 
 input_struct.xlabel = 'Parameter';
 input_struct.ylabel = 'Mean Parameter value';

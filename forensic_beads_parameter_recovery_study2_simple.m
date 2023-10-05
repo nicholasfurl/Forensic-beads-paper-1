@@ -12,7 +12,7 @@ addpath(genpath('C:\matlab_files\fiance\parameter_recovery\beta_fixed_code\Model
 %and is suitable for debugging. Set small_list to 1 to run that. If you
 %want a more thorough range of cofig'ed params, use a different nbumber
 %(e.g., 0)
-small_list = 1;
+small_list = 0;
 
 %1: event index,
 %2:participant private id,
@@ -402,7 +402,7 @@ for seq = 1:numel(seq_start_indices);
         noise_p =        response_bias + response_noise*noiseless_p;
         
         %add some Gaussian noise, using std of the residuals of model fitting
-        std_resid = 55.32/100;
+        std_resid = 73.77/100;
         noise_p = noise_p + randn(1,1)*std_resid;
         
         if noise_p <= 0;

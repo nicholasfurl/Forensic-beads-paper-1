@@ -342,7 +342,7 @@ for seq = 1:numel(seq_start_indices);
         noise_p =        response_bias + response_noise*noiseless_p;
         
         %add some Gaussian noise, using std of the residuals of model fitting
-        std_resid = 55.32/100;
+        std_resid = 55.30/100;
         noise_p = noise_p + randn(1,1)*std_resid;
         
         %Make sure probability stays between 0 and 1

@@ -1,5 +1,5 @@
-%%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
-function forensic_beads_splitTerm_study1_simplify;
+%%%%%%%%%%%%%%%%%%start, forensic_beads_splitTerm_study2_2Suspects_simplify%%%%%%%%%%%%%%%%%%%%%%
+function forensic_beads_splitTerm_study2_2Suspects_simplify;
 
 %Fits a probability estimation model to human probability estimates with
 %prior, split, bias and noise parameters. Fits separate four-param models 
@@ -13,7 +13,7 @@ addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-p
 
 %Setable stuff!
 
-ideal_observer = 1;    %set tpo one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
+ideal_observer = 0;    %set tpo one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
 
 %initial value of free params
 params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
@@ -31,8 +31,8 @@ else;
     %fitted parameters constrained to be between these values
     %technically all params will be free, but you can fix some by forcing their
     %range to be one value only.
-    lower_bounds = [0 .5 -Inf 0];
-    upper_bounds = [1  1  Inf 1];
+    lower_bounds = [0 .5 0 0];
+    upper_bounds = [1  1 1 1];
     
 end;
 
@@ -156,13 +156,26 @@ data = [ ...
 suspect_0 = model_fitting_results.Prior(model_fitting_results.Suspect==0);
 suspect_1 = model_fitting_results.Prior(model_fitting_results.Suspect==1);
 
-%trad t-test
-[th tpvals tci tstats] =  ttest2(suspect_0, suspect_1);
+%get (within-participant) differences between the two prior parameters
+prior_diffs = suspect_0 - suspect_1;
+
+%trad paired t-test
+[th tpvals tci tstats] =   ...   
+    ttest(prior_diffs);
 
 %paired Bayesian test
-[bf10,bfpvals,bfci,bfstats] = bf.ttest2( suspect_0, suspect_1);
+[bf10,bfpvals,bfci,bfstats] = ...
+        bf.ttest( prior_diffs);
 
-disp(sprintf('Suspect effect on prior: trad pval: %0.2f bf10: %7.4f',tpvals,bf10));
+disp(sprintf('Suspect effect on prior: trad pval: %0.2f bf10: %7.0f',tpvals,bf10));
+
+
+% %trad t-test
+% [th tpvals tci tstats] =  ttest2(suspect_0, suspect_1);
+% 
+% %paired Bayesian test
+% [bf10,bfpvals,bfci,bfstats] = bf.ttest2( suspect_0, suspect_1);
+
 
 %Bar plots of parameter values and loss
 make_parameter_plot(model_fitting_results);
@@ -177,7 +190,7 @@ plot_sequence_behaviour(data);
 plot_adjustments(data);
 
 disp('audi5000');
-%%%%%%%%%%%%%%%%%%end, forensic_beads_prior_sim_fit_multiparam_2studies%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%end, forensic_beads_splitTerm_study2_2Suspects_simplify%%%%%%%%%%%%%%%%%%%%%%
 
 
 

@@ -182,7 +182,7 @@ for seq = 1:numel(seq_start_indices);
     for claim = 2:11;
         
         pg=[];
-        q=0.6;
+        q=0.7;
         
         ng = sum( raw(seq_start_indices(seq)+1:seq_start_indices(seq)+claim-1,8) );
         nd = claim-1;

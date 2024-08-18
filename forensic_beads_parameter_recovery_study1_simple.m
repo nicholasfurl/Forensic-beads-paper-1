@@ -33,16 +33,16 @@ claims = data.raw(:,8);
 data = table(stimuli,seq_pos,claims);
 
 %Make lists of configured parametersp
-% config_prior = linspace(0,1,4);
-% config_split = linspace(.6,.9,4);
-% config_response_bias = linspace(0,1,4);
-% config_response_noise = linspace(0,1,4);
+config_prior = linspace(0,1,4);
+config_split = linspace(.6,.9,4);
+config_response_bias = linspace(0,1,4);
+config_response_noise = linspace(0,1,4);
 
 %smaller list, for debugging
-config_prior = [.4 .6];
-config_split = [.6 .8];
-config_response_bias = [.4 .8];
-config_response_noise = [.4 .8];
+% config_prior = [.4 .6];
+% config_split = [.6 .8];
+% config_response_bias = [.4 .8];
+% config_response_noise = [.4 .8];
 
 %EVEN smaller list, for debugging
 % config_prior = [.6];

@@ -1,5 +1,5 @@
-%%%%%%%%%%%%%%%%%%start, forensic_beads_prior_sim%%%%%%%%%%%%%%%%%%%%%%
-function forensic_beads_splitTerm_study1_simplify;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function forensic_beads_study1_;
 
 %Fits a probability estimation model to human probability estimates with
 %prior, split, bias and noise parameters. Fits separate four-param models
@@ -21,7 +21,7 @@ params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
 params(2) = .6;    %split term, initialised to optimal value
 params(3) = 0;  %bias term, intialised to optimal value
 params(4) = 1;  %noise term, initialised to optimal value
-
+ 
 %fitted parameters constrained to be between these values
 %technically all params will be free, but you can fix some by forcing their
 %range to be one value only.

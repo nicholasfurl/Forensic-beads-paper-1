@@ -15,7 +15,7 @@ addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-p
 %%%%%%
 %Set-able stuff!
 
-ideal_observer = 0;    %set tpo one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
+ideal_observer = 0;    %set to one if you want ideal observer; set to something else (like 0) if you want to free the four parameters
 
 %initial value of free params
 params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
@@ -38,8 +38,8 @@ else;
     %fitted parameters constrained to be between these values
     %technically all params will be free, but you can fix some by forcing their
     %range to be one value only.
-    lower_bounds = [0 0 .5 .5 0 0];
-    upper_bounds = [1 1  1  1 1 1];
+    lower_bounds = [0.5 0.5 .7 .7 0 1];
+    upper_bounds = [0.5 0.5 .7 .7 0 1];
     %     lower_bounds = [0 0 .5 .5 0 0 1 1];
     %     upper_bounds = [1 1  1  1 0 0 1 1];
     
@@ -79,7 +79,9 @@ data = ...   %assign data to struct
     'VariableNames', var_names ...
     );
 
+% data = sortrows(data,{'Pid','Suspect','Context'});
 data = sortrows(data,{'Pid','Suspect','Context'});
+
 
 %Who are the participants?
 participant_list = unique(data.Pid,'stable');    %Vitally important participant num order is maintained or it'll get mismatched with results arrays later!!!
@@ -238,10 +240,13 @@ function plot_adjustments(data);
 
 %I wouldn't need to use two steps where I group by participant first for
 %study 1, but I'd need to if I wanted to do Study 2 and want cis over Ps and not trials.
-temp = grpstats(data,{'Claim', 'ContextCat','Suspect','Pid'},{'mean'});
+% temp = grpstats(data,{'Claim', 'ContextCat','Suspect','Pid'},{'mean'});
+temp = grpstats(data,{'Claim', 'Context','Suspect','Pid'},{'mean'});
 
 %Now collapse over participant too, getting ci's over P's as we go
-means = grpstats(temp,{'Claim', 'ContextCat','Suspect'},{'mean' 'meanci'});
+% means = grpstats(temp,{'Claim', 'ContextCat','Suspect'},{'mean' 'meanci'});
+means = grpstats(temp,{'Claim', 'Context','Suspect'},{'mean' 'meanci'});
+
 
 h2 = figure('Color',[1 1 1]);
 
@@ -347,6 +352,12 @@ for suspect = 1:suspects_num;
     legend({'innocent context' 'guilty context'});
    
 end;    %Loop through suspects
+
+%do another plot, but without separating suspect types
+
+
+
+
 %%%%%%%%%%%%%%DISCONFIRMATORY ADJUSTMENT PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -361,7 +372,7 @@ end;    %Loop through suspects
 %%%%%%%%%%%%%%SEQUENCE POSITION PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function plot_sequence_behaviour(data);
 
-%boring plot throatclearing stuff
+%boring plot throat clearing stuff
 cmap = [0 0 0;
     .5 .5 .5;
     ];

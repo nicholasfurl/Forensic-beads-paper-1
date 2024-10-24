@@ -1,0 +1,19 @@
+cbm_hbi_hbi                                       13-Oct-2024 13:10:08
+Running hierarchical bayesian inference (HBI)...
+
+HBI has been initialized according to
+	lap_recency.mat [for model 1]
+	lap_primacy.mat [for model 2]
+	lap_delta.mat [for model 3]
+ 
+Number of samples: 599
+Number of models: 3
+======================================================================
+Iteration 01
+Iteration 02
+	model frequencies (percent)
+	model 1: 0.0| model 2: 0.0| model 3: 100.0| 
+                                                           dL:  721.15
+                                                           dm:    0.00
+                                                           dx:    0.00
+                                                          Converged :]

@@ -1,0 +1,123 @@
+clear all;
+
+%col1: participant string (sorted by participant first)
+%col2: sequence 1 or 2 (sorted by sequence second)
+%col3: Age (years)
+%col4: Gender (0=male, 1=female)
+%col5: Ethnicity
+%col6: Education
+%col7: Experience with criminal justice system
+%col8: 0=healthy 1=schizophrenia diagnosis
+%col9: 0=Mostly Innocent, 1=Mostly Guilty
+%col10: Draws to decision (human)
+%col11: Draws to decision (model)
+%col12: Accuracy (0=incorrect, 1=correct)
+%col13: confidence
+%col14: responsibility
+%col15: danger to others
+%col16: danger to self
+%col17: PDI Yes/no
+%col18: PDI distress
+%col19: PDI preoccupation
+%col20: PDI conviction
+%col21: PDI total
+%col22: response (just a temp var)
+%col23: verdict (0=innocence, 1=guilty)
+%col24: Costs (£)
+%NOTE: col1 contains strings so the matrix "numbers" has the col numbers
+%all one less, because it lacks the first participant col.
+[numbers text all_data] = xlsread('C:\matlab_files\fiance\forensics_beads_SCZ_natalia\Final_data_long_format_for_mixed.csv');
+
+%create a new (23rd) column in numbers to hold the proportion guilt verdicts variable
+for i=1:size(numbers,1);
+    
+    numbers(i,23) = (numbers(i,9)*10);  %costs to sample
+    if numbers(i,11) == 0;  %If wrong decision
+        numbers(i,23) = numbers(i,23) + 1000;
+    end;
+
+end;    %loop through rows of numbers
+
+%get averages for subjects (keeping subjects and diagnosis)
+[numbers_ss numbers_grps_ss] = grpstats(numbers, {text(:,1) numbers(:,7)},{'mean', 'gname'});
+
+xlswrite('C:\matlab_files\fiance\forensics_beads_SCZ_natalia\data_natalia_ss.csv',numbers_ss);
+
+%Now average again to make condition plots but keep only diagnosis and get
+%CIs for plotys
+[numbers_diag_means numbers_diag_ci numbers_diag_grps] = grpstats(numbers_ss, cell2mat(numbers_grps_ss(:,2)),{'mean', 'meanci', 'gname'});
+number_diag_ci_use = numbers_diag_ci(:,:,2) - numbers_diag_means;
+
+figure; set(gcf,'Color',[1 1 1]);
+
+subplot(1,3,1);
+hold on;
+bar([1 1.5], numbers_diag_means(:,9)...
+    , 'FaceColor',[1 1 1]...
+    , 'BarWidth',0.6 ...
+    , 'LineWidth',2 ...
+);
+errorbar([1 1.5],numbers_diag_means(:,9),number_diag_ci_use(:,9), 'LineStyle','none','Color',[0 0 0],'LineWidth',2);
+plot([0 2],[5.5 5.5],'Color',[.75 .75 .75],'LineWidth',2);
+box off;
+set(gca ...
+    , 'xlim', [.75 1.75] ...
+    , 'XTick', [1 1.5] ...
+    , 'XTickLabels', {'Health' 'Schizophrenia'} ...
+    , 'YTick', [0:2:6] ...
+    , 'LineWidth', 2 ...
+    , 'FontName', 'Arial' ...
+    , 'FontSize', 12 ...
+);
+xlabel('Defendant');
+ylabel(sprintf('Mean draws to decision\n(Witness claims)'));
+
+
+subplot(1,3,2);
+hold on;
+bar([1 1.5], numbers_diag_means(:,11)...
+    , 'FaceColor',[1 1 1]...
+    , 'BarWidth',0.6 ...
+    , 'LineWidth',2 ...
+);
+errorbar([1 1.5],numbers_diag_means(:,11),number_diag_ci_use(:,11), 'LineStyle','none','Color',[0 0 0],'LineWidth',2);
+plot([0 2],[1 1],'Color',[.75 .75 .75],'LineWidth',2);
+box off;
+set(gca ...
+    , 'xlim', [.75 1.75] ...
+    , 'XTick', [1 1.5] ...
+    , 'XTickLabels', {'Health' 'Schizophrenia'} ...
+    , 'YLim',[0 1.0] ...
+    , 'YTick', [0:.2:1.0] ...
+    , 'LineWidth', 2 ...
+    , 'FontName', 'Arial' ...
+    , 'FontSize', 12 ...
+);
+xlabel('Defendant');
+ylabel(sprintf('Mean accuracy\n(Proportion correct verdicts)'));
+
+
+subplot(1,3,3);
+hold on;
+bar([1 1.5], numbers_diag_means(:,23)...
+    , 'FaceColor',[1 1 1]...
+    , 'BarWidth',0.6 ...
+    , 'LineWidth',2 ...
+); 
+errorbar([1 1.5],numbers_diag_means(:,23),number_diag_ci_use(:,23), 'LineStyle','none','Color',[0 0 0],'LineWidth',2);
+plot([0 2],[55 55],'Color',[.75 .75 .75],'LineWidth',2);
+box off;
+set(gca ...
+    , 'xlim', [.75 1.75] ...
+    , 'XTick', [1 1.5] ...
+    , 'XTickLabels', {'Health' 'Schizophrenia'} ...
+    , 'YTick', [0:100:1500] ...
+    , 'LineWidth', 2 ...
+    , 'FontName', 'Arial' ...
+    , 'FontSize', 12 ...
+);
+xlabel('Defendant');
+ylabel(sprintf('Mean court costs (£)'));
+
+
+disp('audi5000');

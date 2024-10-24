@@ -4,7 +4,7 @@ function [sus_means_p_ss sus_key_p_ss] = forensic_beads_study2_prior_model;
 %delta can lead to oddball bias. I am adding model fitting and comparison
 %functionality for these models.
 
-%forensic_beads_study2_2024_v2: OK I radically chanmged things. forensic_beads_study2_2024 (i.e., v1) is
+%forensic_beads_study2_2024_v2: OK I radically changed things. forensic_beads_study2_2024 (i.e., v1) is
 %now obsolete and its functionally has been moved here, which is now enturely self-contained.
 %All comments below refer only to forensic_beads_study2_prior_model or its
 %predecessors, designed just to run the prior model. Now it's code has been
@@ -39,9 +39,12 @@ function [sus_means_p_ss sus_key_p_ss] = forensic_beads_study2_prior_model;
 %prior, split, bias and noise parameters. For each participant, fits split
 %noise and bias plus fits a prior to each suspect within participant.
 
+tic
+
 addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\FMINSEARCHBND'))
 addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\klabhub-bayesFactor-3d1e8a5'))
 addpath(genpath('C:\matlab_files\fiance\forensic_beads_pub_repo\Forensic-beads-paper-1\shaded_plots'))
+addpath(genpath('C:\matlab_files\fiance\parameter_recovery\beta_fixed_code\Model_fitting_hybrid_study\plotSpread'));
 
 
 
@@ -87,25 +90,32 @@ participant_list = unique(data.Pid,'stable');    %Vitally important participant 
 num_participants = numel(participant_list);
 
 %initialise table to hold modelling results
-var_names = {'Pid','Loss','PriorMale','PriorFemale','SplitMale','SplitFemale','Bias','Noise'};
-prior_struct. model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
 
-var_names = {'Pid','Loss','Prior male','Prior female','Window','Bias','Noise'};
-recency_struct. model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
-
-var_names = {'Pid','Loss','Prior male','Prior female','Window','Bias','Noise'};
-primacy_struct. model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
-
-var_names = {'Pid','Loss','Prior male','Prior female','Alpha','Beta','Bias','Noise'};
-primacy_struct. model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
-
-%initialise vector to hold models' probabilities
-prior_struct.model_behaviour_results = [];
-recency_struct.model_behaviour_results = [];
-primacy_struct.model_behaviour_results = [];
-delta_struct.model_behaviour_results = [];
+%ground truth (no fitting)
 ground_truth_behaviour_results = [];
 
+%recency
+var_names = {'Pid','Loss','Prior male','Prior female','Window','Bias','Noise'};
+model_struct(1).model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
+model_struct(1).model_behaviour_results = []; %recency
+
+%primacy
+var_names = {'Pid','Loss','Prior male','Prior female','Window','Bias','Noise'};
+model_struct(2).model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
+model_struct(2).model_behaviour_results = [];  %primacy
+
+%delta
+var_names = {'Pid','Loss','Prior male','Prior female','Alpha','Beta'};
+model_struct(3).model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
+model_struct(3).model_behaviour_results = []; %delta
+
+%split
+var_names = {'Pid','Loss','PriorMale','PriorFemale','SplitMale','SplitFemale','Bias','Noise'};
+model_struct(4).model_fitting_results = array2table(nan(0,numel(var_names)), 'VariableNames',var_names);
+model_struct(4).model_behaviour_results = [];  %split
+
+
+%fit models participant by participant
 for participant = 1:num_participants;
     
     clear this_ps_data this_ps_suspect_codes this_ps_num_suspects;
@@ -122,7 +132,7 @@ for participant = 1:num_participants;
     %-----------Ground truth model-----------------
     ground_truth_params = [0.5 0.5 0.7 0.7 0 1];
     ground_truth_struct.this_ps_data = this_ps_data;
-    ground_truth_struct.model_name = 'groundTruth';
+    ground_truth_struct.model_name = 'Ground truth';
     ground_truth_behaviour_results = [ ...
         ground_truth_behaviour_results;
         get_behaviour_for_this_ps_sequences(ground_truth_params,ground_truth_struct) ...
@@ -130,99 +140,130 @@ for participant = 1:num_participants;
 
 
 
-    %     %-----------prior model (deprecated)-----------------
-    %     %set up input struct to fit recency window model
-    %     %initial value of free params
-    %     params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-    %     params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-    %     params(3) = .7;  %split term, initialised to optimal value
-    %     params(4) = .7;  %split term, initialised to optimal value
-    %     params(5) = 0;  %bias term, intialised to optimal value
-    %     params(6) = 1;  %noise term, initialised to optimal value
-    %
-    %     %fitted parameters constrained to be between these values
-    %     prior_struct.lower_bounds = [0 0 0.7 .7 0 0];
-    %     prior_struct.upper_bounds = [1 1  0.7  .7 1 1];
-    %
-    %     prior_struct.participant = participant_list(participant);
-    %     prior_struct.this_ps_data = this_ps_data;
-    %     prior_struct.model_name = 'prior';
-    %
-    %     prior_struct = fit_model(params,prior_struct);
 
-
-
-
-
-
-%     %-----------Recency model-----------------
-%     %set up input struct to fit recency window model
-%     %initial value of free params
-%     params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-%     params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-%     params(3) = 10; %how many samples to look back on from present sample?
-%     params(4) = 0;  %bias term, intialised to optimal value
-%     params(5) = 1;  %noise term, initialised to optimal value
-% 
-%     %fitted parameters constrained to be between these values
-%     recency_struct.lower_bounds = [0 0 1 0 0];
-%     recency_struct.upper_bounds = [1 1 10 1 1];
-% 
-%     recency_struct.participant = participant_list(participant);
-%     recency_struct.this_ps_data = this_ps_data;
-%     recency_struct.model_name = 'recency';
-% 
-%     recency_struct = fit_model(params,recency_struct);
-
-
-
-
-%     %-----------Primacy model-----------------
-%     %set up input struct to fit recency window model
-%     %initial value of free params
-%     params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-%     params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-%     params(3) = 10; %how many samples from the front of the sequence to use with the present sample?
-%     params(4) = 0;  %bias term, intialised to optimal value
-%     params(5) = 1;  %noise term, initialised to optimal value
-% 
-%     %fitted parameters constrained to be between these values
-%     primacy_struct.lower_bounds = [0 0 1 0 0];
-%     primacy_struct.upper_bounds = [1 1 10 1 1];
-% 
-%     primacy_struct.participant = participant_list(participant);
-%     primacy_struct.this_ps_data = this_ps_data;
-%     primacy_struct.model_name = 'primacy';
-% 
-%     primacy_struct = fit_model(params,primacy_struct);
-
-
-
-    %-----------Delta model-----------------
+    %-----------Recency model-----------------
+    
     %set up input struct to fit recency window model
+    model_num = 1;
+    
     %initial value of free params
+    params = [];
     params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
     params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
-    params(3) = 10; %alpha (learning
+    params(3) = 3; %how many samples to look back on from present sample?
     params(4) = 0;  %bias term, intialised to optimal value
     params(5) = 1;  %noise term, initialised to optimal value
 
     %fitted parameters constrained to be between these values
-    primacy_struct.lower_bounds = [0 0 1 0 0];
-    primacy_struct.upper_bounds = [1 1 10 1 1];
+    model_struct(model_num).lower_bounds = [0 0 1 0 0];
+    model_struct(model_num).upper_bounds = [1 1 10 1 1];
 
-    primacy_struct.participant = participant_list(participant);
-    primacy_struct.this_ps_data = this_ps_data;
-    primacy_struct.model_name = 'primacy';
+    model_struct(model_num).participant = participant_list(participant);
+    model_struct(model_num).this_ps_data = this_ps_data;
+    model_struct(model_num).model_name = 'Recency';
 
-    primacy_struct = fit_model(params,primacy_struct);
+    disp(sprintf('-model %s',model_struct(model_num).model_name));
+    model_struct(model_num) = fit_model(params,model_struct(model_num));
+
+
+
+
+    %-----------Primacy model-----------------
+    
+    %set up input struct to fit recency window model
+    model_num = 2;
+    
+    %initial value of free params
+    params = [];
+    params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+    params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+    params(3) = 3; %how many samples from the front of the sequence to use with the present sample?
+    params(4) = 0;  %bias term, intialised to optimal value
+    params(5) = 1;  %noise term, initialised to optimal value
+
+    %fitted parameters constrained to be between these values
+    model_struct(model_num).lower_bounds = [0 0 1 0 0];
+    model_struct(model_num).upper_bounds = [1 1 10 1 1];
+
+    model_struct(model_num).participant = participant_list(participant);
+    model_struct(model_num).this_ps_data = this_ps_data;
+    model_struct(model_num).model_name = 'Primacy';
+
+    disp(sprintf('-model %s',model_struct(model_num).model_name));
+    model_struct(model_num) = fit_model(params,model_struct(model_num));
+
+
+
+
+
+    %-----------Delta model-----------------
+    
+    %set up input struct to fit recency window model
+    model_num = 3;
+    
+    %initial value of free params
+    params = [];
+    params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+    params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+    params(3) = .5; %alpha (learning rate)
+    params(4) = 1;  %beta (inverse temp)
+
+    %fitted parameters constrained to be between these values
+    model_struct(model_num).lower_bounds = [0 0 eps 0];
+    model_struct(model_num).upper_bounds = [1 1 Inf Inf];
+
+    model_struct(model_num).participant = participant_list(participant);
+    model_struct(model_num).this_ps_data = this_ps_data;
+    model_struct(model_num).model_name = 'Delta';
+
+    disp(sprintf('-model %s',model_struct(model_num).model_name));
+    model_struct(model_num) = fit_model(params,model_struct(model_num));
+
+
+
+
+    %-----------Split model (deprecated)-----------------#
+   
+    %set up input struct to fit recency window model
+    model_num = 4;
+    
+    %initial value of free params
+    params = [];
+    params(1) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+    params(2) = .5; %prior, initialised to optimal value (ground truth of paradigm)
+    params(3) = .7;  %split term, initialised to optimal value
+    params(4) = .7;  %split term, initialised to optimal value
+    params(5) = 0;  %bias term, intialised to optimal value
+    params(6) = 1;  %noise term, initialised to optimal value
+
+    %fitted parameters constrained to be between these values
+    model_struct(model_num).lower_bounds = [0 0 0.5 .5 0 0];
+    model_struct(model_num).upper_bounds = [1 1  1  1 1 1];
+
+    model_struct(model_num).participant = participant_list(participant);
+    model_struct(model_num).this_ps_data = this_ps_data;
+    model_struct(model_num).model_name = 'Split';
+
+    disp(sprintf('-model %s',model_struct(model_num).model_name));
+    model_struct(model_num) = fit_model(params,model_struct(model_num));
+
+
 
 
 
 end;    %loop through participants
 
-winning_model_struct = primacy_struct;
-    
+fits_figure_struct.handle = figure; set(gcf,'Color',[1 1 1]);
+fits_figure_struct.subplot_comparison = [2,1,1];
+fits_figure_struct.subplot_parameters = [2,1,2];
+fits_figure_struct.spreadwidth = 1;
+fits_figure_struct.alpha = .1;
+fits_figure_struct.graph_font = 12;
+
+[winning_model_it winning_model_name] = compare_models(model_struct, fits_figure_struct);
+
+
+winning_model_struct = model_struct(winning_model_it);
 
 %Add the accumulated model probabilities as column of data table
 data.ModelProbability = winning_model_struct.model_behaviour_results;
@@ -231,6 +272,14 @@ data.ModelProbability = winning_model_struct.model_behaviour_results;
 data.GroundTruthProbability = ground_truth_behaviour_results;
 
 %add adjustment columns to data table
+
+%This is a distraction but I need it if I'm going to repeatedly use this
+%code during debugging
+columns_in_question = {'HumanAdjust','ModelAdjust','GroundTruthAdjust'};
+columns_exist = ismember(columns_in_question, data.Properties.VariableNames);
+if any(columns_exist)
+    data = removevars(data, columns_in_question(columns_exist));
+end;
 data = [ ...
     data, ...
     array2table(get_adjustments(data),'VariableNames',{'HumanAdjust','ModelAdjust','GroundTruthAdjust'}) ...
@@ -252,21 +301,53 @@ winning_model_diffs = winning_model_struct.model_fitting_results{:,'Prior male'}
 
 disp(sprintf('Suspect effect on prior: trad pval: %0.2f bf10: %7.0f',tpvals,bf10));
 
-% 
+ 
 % %Bar plots of parameter values and loss
-% make_parameter_plot(recency_struct.model_fitting_results);
+% make_parameter_plot(model_struct(model_num).model_fitting_results);
 
-%Kernel distribution plot of the prior parameter values
-% make_kernel_dists(model_fitting_results);
-
-plot_sequences(data);
+plot_sequences(data, winning_model_name);
 
 % %Plot adjustments by suspect and context
-plot_adjustments(data);
+plot_adjustments(data, winning_model_name);
 
 fprintf('');
 
+%Some analysis of residuals
+figure; 
+
+%normally distributed probabilities (all trials, ignoring participant)?
+subplot(2,2,1);
+hist(winning_model_struct.model_behaviour_results);
+title('Probabilities, all trials')
+xlabel('Model probability');
+ylabel('Number of trials');
+
+%normally distributed probabilities (participant averages)?
+subplot(2,2,2)
+hist(grpstats(winning_model_struct.model_behaviour_results,data.Pid,{'mean'}));
+title('Probabilities, participants')
+xlabel('Mean(model probability)');
+ylabel('Number of participants');
+
+%all residuals
+residuals_trials = winning_model_struct.model_behaviour_results - data.HumanProbability;
+
+subplot(2,2,3)
+hist(residuals_trials);
+title('Raw residuals, trials');
+xlabel('Model probability - human probability');
+ylabel('Number of trials');
+
+subplot(2,2,4)
+hist(grpstats(residuals_trials,data.Pid,{'mean'}));
+title('Raw residuals, participants');
+xlabel('Mean(model probability - human probability)');
+ylabel('Number of participants');
+
+
 disp('audi5000');
+
+toc
 %%%%%%%%%%%%%%%%%%end, forensic_beads_study2_2024_v2 (main function body)%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -284,11 +365,13 @@ function [] = plot_sequence_panels(plot_details)
 
 figure(plot_details.fig);
 
-line_colors = [1 1 1; 1 1 1; 0 0 0; 0 0 0];
+% line_colors = [1 1 1; 1 1 1; 0 0 0; 0 0 0];
+line_colors = [ones(2,3); repmat(plot_details.color,2,1)];
+line_widths = [.5 .5 1 1];
 
 y_pos = [30 90 25 80];
 markersize = 4;
-asterisk_y_displacement = 3;
+asterisk_y_displacement = 5;
 asterisk_size = 6;
 
 sequence_type_string = {'Innocent sequences' 'Guilty sequences'};
@@ -328,10 +411,10 @@ for plot = 1:2; %innocent and guilty sequences
             hl = line( ...
                 [(j-1)+jitter (j-1)+jitter] ...
                 ,[plot_details.cis(i,j,2) plot_details.cis(i,j,1)] ...
-                , 'Color',[0 0 0] ...
+                , 'Color',plot_details.color ...
                 , 'Marker','none' ...
                 ,'LineStyle','-' ...
-                ,'LineWidth',1 ...
+                ,'LineWidth',1.5 ...
                 );
             hl.Annotation.LegendInformation.IconDisplayStyle = 'off';
 
@@ -354,15 +437,15 @@ for plot = 1:2; %innocent and guilty sequences
 
         end; %Loop through sequence positions
 
-        %Plot human means and lines between them
+        %Plot means and lines between them
         line([0:10]+jitter, plot_details.means(i,:) ...
-            , 'Color',[0 0 0] ...
+            , 'Color',plot_details.color  ...
             , 'Marker','o' ...
             ,'MarkerSize',markersize ...
             ,'MarkerFaceColor',line_colors(i,:) ...
-            ,'MarkerEdgeColor',[0 0 0] ...
+            ,'MarkerEdgeColor',plot_details.color ...
             ,'LineStyle','-' ...
-            ,'LineWidth',1 ...
+            ,'LineWidth',line_widths(i) ...
             );
 
     end;    %loop through male and female lines
@@ -398,7 +481,7 @@ legend_strs = { ...
     sprintf('Male, %s', plot_details.label) ...
     sprintf('Female, %s', plot_details.label) ...
     };
-lgd = legend(legend_strs, 'Location', 'southeast');
+lgd = legend(legend_strs, 'Location', 'southwest');
 legend boxoff;
 lgd.FontSize = plot_details.graph_font;
 lgd.FontName = 'Arial';
@@ -414,7 +497,7 @@ lgd.FontName = 'Arial';
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [] = plot_sequences(data);
+function [] = plot_sequences(data, name);
 
 [sus_means_p_ss sus_means_ss sus_means_m_ss seq_key] = reformat_sequence_data(data);
 
@@ -437,6 +520,7 @@ plot_details.means = sus_means_m;
 plot_details.cis = [];
 plot_details.posthocs = [];
 plot_details.label = 'ground truth';
+plot_details.color = [0 0 1];
 
 %make pair of plots
 plot_sequence_panels(plot_details);
@@ -459,7 +543,7 @@ plot_details.means = sus_means;
 plot_details.cis = sus_cis;
 plot_details.posthocs = posthocs;
 plot_details.label = 'participants';
-
+plot_details.color = [0 0 0];
 %make pair of plots
 plot_sequence_panels(plot_details);
 
@@ -477,7 +561,8 @@ plot_details.subplot_num = 5;
 plot_details.means = sus_means_p;
 plot_details.cis = sus_cis_p;
 plot_details.posthocs = posthocs;
-plot_details.label = 'prior';
+plot_details.label = name;
+plot_details.color = [0 1 0];
 
 %make pair of plots
 plot_sequence_panels(plot_details);
@@ -612,7 +697,7 @@ for seq = 1:numel(seq_start_indices);
     %What suspect parameter do I need to use for this sequence?
     this_suspect_code = this_ps_data.Suspect(seq_start_indices(seq));
 
-    if strcmp(model_struct.model_name,'prior');   %prior has a suspect and a split separate for each suspect, but other models only have separate suspects
+    if strcmp(model_struct.model_name,'Split');   %prior has a suspect and a split separate for each suspect, but other models only have separate suspects
 
         %modify param vector to pick out the prior for this sequences suspect
         %     this_params = [new_params(this_suspect_code+1) new_params(this_suspect_code + 3) new_params(this_suspect_code + 5) new_params(this_suspect_code + 7)];
@@ -630,32 +715,39 @@ for seq = 1:numel(seq_start_indices);
     %Hand just the one sequence to get_model_behaviour, together with
     %suspect-specific parameter vector and then accumulate it with the
     %other sequences for this participant to be returned by function
-    if strcmp(model_struct.model_name,'prior');
+    if strcmp(model_struct.model_name,'Split')
 
         sequence_probabilities = [ ...
             sequence_probabilities; ...
-            prob_guilt_prior(this_params,this_seq_data)*100 ...  %function specific to this model and its parameters
+            prob_guilt_split(this_params,this_seq_data)*100 ...  %function specific to this model and its parameters
             ];
 
-    elseif strcmp(model_struct.model_name,'groundTruth');
+    elseif strcmp(model_struct.model_name,'Ground truth');
 
         sequence_probabilities = [ ...
             sequence_probabilities; ...
             prob_guilt_groundTruth(this_params,this_seq_data)*100 ...  %function specific to this model and its parameters
             ];
 
-    elseif strcmp(model_struct.model_name,'recency');
+    elseif strcmp(model_struct.model_name,'Recency');
 
         sequence_probabilities = [ ...
             sequence_probabilities; ...
             prob_guilt_recency(this_params,this_seq_data)*100 ...  %function specific to this model and its parameters
             ];
 
-    elseif strcmp(model_struct.model_name,'primacy');
+    elseif strcmp(model_struct.model_name,'Primacy');
 
         sequence_probabilities = [ ...
             sequence_probabilities; ...
             prob_guilt_primacy(this_params,this_seq_data)*100 ...  %function specific to this model and its parameters
+            ];
+
+     elseif strcmp(model_struct.model_name,'Delta');
+
+         sequence_probabilities = [ ...
+            sequence_probabilities; ...
+            prob_guilt_delta(this_params,this_seq_data)*100 ...  %function specific to this model and its parameters
             ];
 
     end    %which model?
@@ -672,7 +764,7 @@ end;    %seq: loop through this participant's sequences
 
 
 % %%%%%%%%%%%%%%DISCONFIRMATORY ADJUSTMENT PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function plot_adjustments(data);
+function plot_adjustments(data, name);
 
 %setup plot
 input_struct.fig = figure('Color',[1 1 1]);
@@ -685,13 +777,19 @@ input_struct.model_colours = [0 0 1; 0 1 0];
 
 input_struct.subplot = [2,1,1];
 
+%For some reason, the claims column still retains the 3's for the priors
+%(where there is no adjustment data) and so the next step creates NaN
+%entries for those, which clog things up when plotting later. I'll just
+%replace the 3s with NaNs within the scope of this function.
+data.Claim(data.Claim == 3) = NaN;
+
 %Get means over trials for each participant then get means and cis over participants for errorbars
 %input_struct.means now contains table with all the mean and ci data
 input_struct.means = grpstats( ...
     grpstats(data,{'Claim', 'Suspect','Pid'},{'mean'}), ...
     {'Claim','Suspect'},{'mean' 'meanci'});
 
-input_struct.legend = {'Man suspect', 'Woman suspect', 'Ground truth', 'Prior model'};
+input_struct.legend = {'Male suspect', 'Female suspect', 'Ground truth', name};
 
 b = make_grouped_bar_with_errors(input_struct);
 
@@ -708,7 +806,7 @@ input_struct.means = grpstats( ...
     grpstats(data,{'Claim', context_type,'Pid'},{'mean'}), ...
     {'Claim',context_type},{'mean' 'meanci'});
 
-input_struct.legend = {'Preceding innocent context', 'Preceding guilty context', 'Ground truth', 'Prior model'}
+input_struct.legend = {'Preceding innocent context', 'Preceding guilty context', 'Ground truth', name};
 
 b = make_grouped_bar_with_errors(input_struct);
 % %%%%%%%%%%%%%%DISCONFIRMATORY ADJUSTMENT PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -723,71 +821,71 @@ b = make_grouped_bar_with_errors(input_struct);
 
 
 
-%%%%%%%%%%%%%%MAKE_PARAMETER_PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function make_parameter_plot(model_fitting_results);
-
-all_column_names = model_fitting_results.Properties.VariableNames
-parameter_names = all_column_names(3:end);
-
-%Every row is a participant already and suspects are in cols, so just get mean and ci for whole column
-param_means = grpstats(model_fitting_results, [],{'mean'});
-
-%Every row is a participant already and suspects are in cols, so just get mean and ci for whole column
-param_cis = grpstats(model_fitting_results, [],{'meanci'});
-
-%plot
-h1 = figure('Color',[1 1 1]);
-input_struct.fig = h1;
-
-%Put parameter values in first subplot
-input_struct.subplot = [1,2,1];
-
-input_struct.input_means = param_means{:, 4:end};
-
-input_struct.input_ci = [];
-for i = 4:width(param_cis)
-    % Extract the second subcolumn (upper bound of the CI)
-    input_struct.input_ci(:, i-3) = param_cis{:, i}(:, 2) - input_struct.input_means(i-3);
-end
-
-input_struct.xlabel = 'Parameter';
-input_struct.ylabel = 'Parameter value';
-input_struct.title = [];
-input_struct.ylim = [0 1];
-b = make_grouped_bar_with_errors(input_struct);
-
-clear input_struct; %just in case ...
-
-
-%loss plot
-input_struct.fig = h1;
-input_struct.subplot = [1,2,2];
-
-input_struct.input_means = ...
-    param_means.mean_Loss;
-
-input_struct.input_ci = ...
-    param_cis.meanci_Loss(:,2) - ...
-    input_struct.input_means;
-
-input_struct.xlabel = '';
-input_struct.ylabel = 'Squared error (loss)';
-input_struct.title = 'Model fit';
-input_struct.ylim = [0 150000];
-
-b = make_grouped_bar_with_errors(input_struct);
-
-
-%While I'm at it, get the grand standard deviation of the residuals for use
-%in parameter recovery
-
-% %average all rows (sequences / one sequence per participant)
-% model_fitting_results.residual = sqrt( model_fitting_results.Loss );
-% model_fitting_results.Ones = ones(size(model_fitting_results,1),1);
-% stds = grpstats(model_fitting_results, 'Ones',{'std'});
+% %%%%%%%%%%%%%%MAKE_PARAMETER_PLOT BEGIN%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% function make_parameter_plot(model_fitting_results);
 % 
-% disp(sprintf('std of all residuals is: %4.4f',stds.std_residual));
-%%%%%%%%%%%%%%MAKE_PARAMETER_PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% all_column_names = model_fitting_results.Properties.VariableNames
+% parameter_names = all_column_names(3:end);
+% 
+% %Every row is a participant already and suspects are in cols, so just get mean and ci for whole column
+% param_means = grpstats(model_fitting_results, [],{'mean'});
+% 
+% %Every row is a participant already and suspects are in cols, so just get mean and ci for whole column
+% param_cis = grpstats(model_fitting_results, [],{'meanci'});
+% 
+% %plot
+% h1 = figure('Color',[1 1 1]);
+% input_struct.fig = h1;
+% 
+% %Put parameter values in first subplot
+% input_struct.subplot = [1,2,1];
+% 
+% input_struct.input_means = param_means{:, 4:end};
+% 
+% input_struct.input_ci = [];
+% for i = 4:width(param_cis)
+%     % Extract the second subcolumn (upper bound of the CI)
+%     input_struct.input_ci(:, i-3) = param_cis{:, i}(:, 2) - input_struct.input_means(i-3);
+% end
+% 
+% input_struct.xlabel = 'Parameter';
+% input_struct.ylabel = 'Parameter value';
+% input_struct.title = [];
+% % input_struct.ylim = [0 1];
+% b = make_grouped_bar_with_errors(input_struct);
+% 
+% clear input_struct; %just in case ...
+% 
+% 
+% %loss plot
+% input_struct.fig = h1;
+% input_struct.subplot = [1,2,2];
+% 
+% input_struct.input_means = ...
+%     param_means.mean_Loss;
+% 
+% input_struct.input_ci = ...
+%     param_cis.meanci_Loss(:,2) - ...
+%     input_struct.input_means;
+% 
+% input_struct.xlabel = '';
+% input_struct.ylabel = 'Squared error (loss)';
+% input_struct.title = 'Model fit';
+% input_struct.ylim = [0 150000];
+% 
+% b = make_grouped_bar_with_errors(input_struct);
+% 
+% 
+% %While I'm at it, get the grand standard deviation of the residuals for use
+% %in parameter recovery
+% 
+% % %average all rows (sequences / one sequence per participant)
+% % model_fitting_results.residual = sqrt( model_fitting_results.Loss );
+% % model_fitting_results.Ones = ones(size(model_fitting_results,1),1);
+% % stds = grpstats(model_fitting_results, 'Ones',{'std'});
+% % 
+% % disp(sprintf('std of all residuals is: %4.4f',stds.std_residual));
+% %%%%%%%%%%%%%%MAKE_PARAMETER_PLOT ENDS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
@@ -818,6 +916,7 @@ fitted_probabilities = ...
         loss = loss + (y_hat - y)^2;
         
     end;    %loop through trials, this suspect
+    fprintf('')
 %%%%%%%%%%%%%%%%%%end, get_model_loss%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -923,6 +1022,7 @@ end;
 
 
 model_line_width = 0.075;
+jitter = 0.02;
 x= x';
 for x_pos = 1:numel(x)
 
@@ -945,7 +1045,7 @@ for x_pos = 1:numel(x)
 
     %ground truth mean line
     line( ...
-            [x(x_pos)-model_line_width x(x_pos)+model_line_width] ...
+            [x(x_pos)-model_line_width-jitter x(x_pos)+model_line_width-jitter] ...
             ,[groundTruth_means(x_pos) groundTruth_means(x_pos)] ...
             , 'Color',input_struct.model_colours(1,:) ...
             , 'Marker','none' ...
@@ -955,7 +1055,7 @@ for x_pos = 1:numel(x)
         
     %ground truth errorbar
     line( ...
-        [x(x_pos) x(x_pos)] ...
+        [x(x_pos)-jitter x(x_pos)-jitter] ...
         ,[groundTruth_means(x_pos) - groundTruth_cis(x_pos) groundTruth_means(x_pos) + groundTruth_cis(x_pos)] ...
         , 'Color',input_struct.model_colours(1,:) ...
         , 'Marker','none' ...
@@ -965,7 +1065,7 @@ for x_pos = 1:numel(x)
 
     %prior model mean line
     line( ...
-            [x(x_pos)-model_line_width x(x_pos)+model_line_width] ...
+            [x(x_pos)-model_line_width+jitter x(x_pos)+model_line_width+jitter] ...
             ,[prior_means(x_pos) prior_means(x_pos)] ...
             , 'Color',input_struct.model_colours(2,:) ...
             , 'Marker','none' ...
@@ -975,7 +1075,7 @@ for x_pos = 1:numel(x)
         
     %prior model errorbar
     line( ...
-        [x(x_pos) x(x_pos)] ...
+        [x(x_pos)+jitter x(x_pos)+jitter] ...
         ,[prior_means(x_pos) - prior_cis(x_pos) prior_means(x_pos) + prior_cis(x_pos)] ...
         , 'Color',input_struct.model_colours(2,:) ...
         , 'Marker','none' ...
@@ -987,7 +1087,7 @@ end;    %loop through claim*suspect conditions / pocitions on x axis (x_pos)
 
 box off;
 xlim([.5 2.5]);
-ylim([-15 15]);
+ylim([-16 16]);
 ylabel('Mean adjustment towards guilty');
 set(gca ...
     ,'YTick',[-15:3:15] ...
@@ -1205,11 +1305,8 @@ end;    %loop through sequences
 
 
 
-%%%%%%%%%%%%%%%%%%start, prob_guilt_prior%%%%%%%%%%%%%%%%%%%%%%
-function model_probabilities = prob_guilt_prior(params, this_ps_suspect_data)
-
-%Was previously get_model_behaviour. This prior model (which can't explain
-%disconfirmatory bias) is deprecated in forensic_beads_study2_2024_v3.
+%%%%%%%%%%%%%%%%%%start, prob_guilt_split%%%%%%%%%%%%%%%%%%%%%%
+function model_probabilities = prob_guilt_split(params, this_ps_suspect_data)
 
 prior = params(1);
 split = params(2);
@@ -1257,7 +1354,7 @@ for seq = 1:numel(seq_start_indices);
     end;    %loop through this sequence (claim)
     
 end;    %loop through sequences
-%%%%%%%%%%%%%%%%%%end, guilt_prob_prior%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%end, guilt_prob_split%%%%%%%%%%%%%%%%%%%%%%
 
 
 
@@ -1323,6 +1420,9 @@ end;    %loop through sequences
 
 
 
+
+
+
 %%%%%%%%%%%%%%%%%%start, prob_guilt_primacy%%%%%%%%%%%%%%%%%%%%%%
 function model_probabilities = prob_guilt_primacy(params, this_ps_suspect_data)
 
@@ -1381,6 +1481,188 @@ for seq = 1:numel(seq_start_indices);
     
 end;    %loop through sequences
 %%%%%%%%%%%%%%%%%%end, guilt_prob_primacy%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%start, prob_guilt_delta%%%%%%%%%%%%%%%%%%%%%%
+function model_probabilities = prob_guilt_delta(params, this_ps_suspect_data)
+
+
+prior = params(1);
+alpha = params(2);
+beta = params(3);
+
+%on which indices is the display screen 0 (prior rating prompt so first rating)
+seq_start_indices = find(this_ps_suspect_data.SequencePosition==0);
+
+%initialise output
+model_probabilities = nan(size(this_ps_suspect_data,1),1);
+
+%For each start index, loop through sequence and get model predictions
+for seq = 1:numel(seq_start_indices);
+
+    draws = this_ps_suspect_data.Claim(seq_start_indices(seq):seq_start_indices(seq)+10);
+
+    %Loop through this sequence
+    for claim = 1:11;
+
+        if claim == 1; 
+            
+             q_hat = prior;  %first update, without info, based just on prior
+        
+        else;
+
+            q_hat = q_hat + alpha * (draws(claim) - q_hat);
+        
+        end;
+
+        model_probabilities(claim,1) = exp(beta*q_hat)/(exp(beta*q_hat) + exp(beta*(1-q_hat)));
+
+    end;    %loop through this sequence (claim)
+    
+end;    %loop through sequences
+
+%%%%%%%%%%%%%%%%%%end, guilt_prob_delta%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%START, compare_models%%%%%%%%%%%%%%%
+function [winning_model_it, winning_model_name] = compare_models(model_struct, fits_figure_struct);
+
+num_models = size(model_struct,2);
+
+plot_cmap = jet(num_models);
+
+figure(fits_figure_struct.handle );
+
+%model comparison plot
+% subplot(fits_figure_struct.subplot_comparison(1), fits_figure_struct.subplot_comparison(2), fits_figure_struct.subplot_comparison(3));
+
+%get losses and convert to BIC
+for model = 1:num_models;
+
+    N = 88;  %number of probability judgments per fitted participants 
+    k = width( model_struct(model).model_fitting_results ) - 2; %num parameters (num columns not counting pid and loss)
+    fit_vals(:,model) = log( N )*k - 2*log(model_struct(model).model_fitting_results.Loss); %BIC
+%     fit_vals(:,model) = 2*k - 2*log(model_struct(model).model_fitting_results.Loss); %AIC
+
+    handles = plotSpread(fit_vals(:,model) ...
+        , 'xValues',model...
+        ,'distributionColors',[0 0 0] ...
+        ,'distributionMarkers','.' ...
+        , 'spreadWidth', fits_figure_struct.spreadwidth ...
+        );
+
+    bar(model,mean(fit_vals(:,model)), ...
+        'FaceColor',[0 0 0],'FaceAlpha',fits_figure_struct.alpha,'EdgeColor',[0 0 0] );
+
+       % Update XTicks and XTickLabels
+       set(gca, 'XTick', 1:model); % Set x-ticks from 1 to i
+       
+       % Set the label for the current bar (you can use the field name or value from struct)
+       xticklabels = get(gca, 'XTickLabel');  % Get current XTick labels
+       xticklabels{model} = model_struct(model).model_name; % Set the label for the current bar
+       set(gca, 'XTickLabel', xticklabels); % Apply the updated XTick label
+
+end;    %loop through models
+
+box off;
+ylabel('Bayesian information criterion');
+set(gca ...
+    ,'fontSize',fits_figure_struct.graph_font ...
+    ,'FontName','Arial'...
+    );
+
+%add ttest results to plot
+pairs = nchoosek(1:size(fit_vals,2),2); %get pairs to test
+pairs= sortrows(pairs(:,[2 1]),'descend');
+num_pairs = size(pairs,1);
+
+max_y = max(max(fit_vals));
+y_inc = .05*max_y;
+ystart = max_y + y_inc*num_pairs;
+line_y_values = ystart:-y_inc:0;
+
+for pair = 1:num_pairs;
+    
+    %trad t-test
+    [h tpvals(pair) ci stats] =   ...      
+        ttest2( fit_vals(:,pairs(pair,1)), fit_vals(:,pairs(pair,2)) );
+
+%     %Bayes Factors
+%     [bf10(pair),pvals(pair),ci,stats] = ...
+%         bf.ttest2( fit_vals(:,pairs(pair,1)), fit_vals(:,pairs(pair,2)) );
+    
+     if tpvals(pair) < .05/num_pairs;
+        
+         plot([pairs(pair,1) pairs(pair,2)],...
+            [line_y_values(pair) line_y_values(pair)],'LineWidth',1.5,'Color',[0 0 0]);
+        
+     end;    %plot a significance line for this pair?
+        
+end;    %loop through pairs for Bayesian pairwise tests
+
+set(gca,'YTick',[-10:10:round(max_y)],'YLim',[-10 ystart]);
+
+%Plot parameters of winning model
+[dummy, winning_model_it] = min(mean(fit_vals));
+winning_model_name = model_struct(winning_model_it).model_name;
+
+% %plot of parameter values of winning model
+% subplot(fits_figure_struct.subplot_parameters(1), fits_figure_struct.subplot_parameters(2), fits_figure_struct.subplot_parameters(3));
+% 
+% winning_model = model_struct(winning_model_it);
+% 
+% all_column_names = winning_model.model_fitting_results.Properties.VariableNames;
+% parameter_names = all_column_names(3:end);
+% num_params = numel(parameter_names);
+% 
+% %plot each param in turn
+% for param = 1:num_params;
+% 
+%     handles = plotSpread(winning_model.model_fitting_results{:,param+2} ...
+%         , 'xValues',param...
+%         ,'distributionColors',[0 0 0] ...
+%         ,'distributionMarkers','.' ...
+%         , 'spreadWidth', fits_figure_struct.spreadwidth ...
+%         );
+% 
+%     bar(param, ...
+%         mean( winning_model.model_fitting_results{:,param+2} ), ...
+%         'FaceColor',[.5 .5 .5],'FaceAlpha',fits_figure_struct.alpha,'EdgeColor',[0 0 0] );
+% 
+%        % Update XTicks and XTickLabels
+%        set(gca, 'XTick', 1:param); % Set x-ticks from 1 to i
+%        
+%        % Set the label for the current bar (you can use the field name or value from struct)
+%        xticklabels = get(gca, 'XTickLabel');  % Get current XTick labels
+%        xticklabels{param} = all_column_names{param+2}; % Set the label for the current bar
+%        set(gca, 'XTickLabel', xticklabels); % Apply the updated XTick label
+% 
+% end;    %loop through params
+% 
+% box off;
+% ylabel('Parameter value');
+% set(gca ...
+%     ,'fontSize',fits_figure_struct.graph_font ...
+%     ,'FontName','Arial'...
+%     );
+% 
+% ylim([0 1]); 
+
+
+%%%%%%%%%%%%%%%%END, compare_models%%%%%%%%%%%%%%%
+
 
 
 
